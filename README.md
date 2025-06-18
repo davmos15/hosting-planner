@@ -63,7 +63,21 @@ npx http-server -p 8000
 4. Set Firestore rules (see Security section)
 
 #### Deployment
-The app is configured for Vercel deployment:
+
+**Environment Variables Setup (Required)**
+Before deploying, you must set up Firebase environment variables:
+
+1. In your Vercel dashboard, go to Settings → Environment Variables
+2. Add these variables with your Firebase config values:
+   - `VITE_FIREBASE_API_KEY`
+   - `VITE_FIREBASE_AUTH_DOMAIN` 
+   - `VITE_FIREBASE_PROJECT_ID`
+   - `VITE_FIREBASE_STORAGE_BUCKET`
+   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+   - `VITE_FIREBASE_APP_ID`
+   - `VITE_FIREBASE_MEASUREMENT_ID`
+
+**Deploy to Vercel:**
 ```bash
 # Install Vercel CLI
 npm i -g vercel
