@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">Hosting Planner</title>
+    
+    <!-- Firebase Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
+    
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Sync Status Indicator -->
+    <div id="sync-status" class="sync-status sync-offline">⚫ Connecting...</div>
+    
+    <!-- New Event Button -->
+    <button class="new-event-btn" onclick="createNewEvent()">✨ New Event +</button>
+
+    <div class="container">
+        <div class="header">
+            <input type="text" class="event-name-input" id="event-name" placeholder="Enter event name..." value="Hosting Planner" onchange="updateEventName(this.value)">
+            <div class="date" id="current-date" onclick="editDate()"></div>
+            <input type="text" class="address-input" id="current-address" placeholder="📍 Enter event address..." onchange="updateAddress(this.value)">
+        </div>
+        
+        <div class="host-info">
+            <h2>The Host(s)</h2>
+            <input type="text" class="host-input" id="current-host" placeholder="Enter host name(s)..." onchange="updateHost(this.value)">
+        </div>
+        
+        <div class="section">
+            <div class="section-header">
+                <h3>👥 Guests</h3>
+            </div>
+            <div id="rsvp-list"></div>
+        </div>
+        
+        <div class="total-guests" id="guest-summary"></div>
+        
+        <div class="section">
+            <div class="section-header">
+                <h3>🍽️ What to Bring</h3>
+                <button class="edit-btn" onclick="editItems()">✏️ Edit Items</button>
+            </div>
+            <div id="bring-list"></div>
+        </div>
+        
+        <button class="summary-btn" onclick="shareSummary()">
+            📱 Share Update
+        </button>
+    </div>
+
+    <!-- Selection Modal -->
+    <div class="modal" id="selection-modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Select Person</h3>
+            <div id="person-list"></div>
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Items Modal -->
+    <div class="modal" id="edit-modal">
+        <div class="modal-content">
+            <h3>Edit What to Bring</h3>
+            <div id="edit-list"></div>
+            <input type="text" id="new-item-input" placeholder="Add new item..." 
+                   style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; margin: 10px 0;"
+                   onkeypress="if(event.key==='Enter') addNewItem()">
+            <div class="modal-buttons">
+                <button class="modal-btn primary" onclick="addNewItem()">Add Item</button>
+                <button class="modal-btn secondary" onclick="closeEditModal()">Done</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Edit Date Modal -->
+    <div class="modal" id="date-modal">
+        <div class="modal-content">
+            <h3>Set Event Date</h3>
+            <input type="date" id="date-input" 
+                   style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; margin: 10px 0;">
+            <div class="modal-buttons">
+                <button class="modal-btn primary" onclick="saveDate()">Save Date</button>
+                <button class="modal-btn secondary" onclick="closeDateModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Guests Modal -->
+    <div class="modal" id="guests-modal">
+        <div class="modal-content">
+            <h3>Add Guests</h3>
+            <input type="text" id="guest-name-input" placeholder="e.g., John, Sarah's Family - 5, Mike, The Smiths - 8" 
+                   style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; margin: 10px 0;"
+                   onkeypress="if(event.key==='Enter') addGuest()">
+            <small style="display: block; color: #718096; margin-bottom: 15px;">Comma-separated list. Add " - number" for groups (defaults to 1)</small>
+            <div class="modal-buttons">
+                <button class="modal-btn primary" onclick="addGuest()">Add Guests</button>
+                <button class="modal-btn secondary" onclick="closeGuestsModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Modal -->
+    <div class="modal" id="password-modal">
+        <div class="modal-content">
+            <h3>Password Required</h3>
+            <p>This event is password protected.</p>
+            <input type="password" id="password-input" placeholder="Enter password" onkeypress="if(event.key==='Enter') checkPassword()">
+            <div class="modal-buttons">
+                <button class="modal-btn primary" onclick="checkPassword()">Access Event</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Event Modal (same as landing page) -->
+    <div class="modal" id="create-event-modal">
+        <div class="modal-content large-modal">
+            <h3>Create New Event</h3>
+            
+            <div class="form-section">
+                <label for="event-name-input">Event Name *</label>
+                <input type="text" id="event-name-input" placeholder="e.g., Birthday Party, Team Dinner" required>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-section">
+                    <label for="event-date-input">Date *</label>
+                    <input type="date" id="event-date-input" required>
+                </div>
+                <div class="form-section">
+                    <label for="event-host-input">Host(s)</label>
+                    <input type="text" id="event-host-input" placeholder="Who's hosting?">
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <label for="event-address-input">Address</label>
+                <input type="text" id="event-address-input" placeholder="Event location">
+            </div>
+            
+            <div class="form-section">
+                <label for="initial-guests-input">Initial Guests (optional)</label>
+                <input type="text" id="initial-guests-input" placeholder="e.g., John, Sarah's Family - 5, Mike, The Smiths - 8">
+                <small>Comma-separated list. Add " - number" for groups (defaults to 1)</small>
+            </div>
+            
+            <div class="form-section">
+                <label for="initial-items-input">Items Needed (optional)</label>
+                <input type="text" id="initial-items-input" placeholder="e.g., Salad, Main dish, Dessert, Drinks">
+                <small>Comma-separated list of items</small>
+            </div>
+            
+            <div class="form-section">
+                <label for="event-password-input">Password Protection (optional)</label>
+                <input type="password" id="event-password-input" placeholder="Leave blank for no password">
+                <small>If set, guests will need this password to access the event</small>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeCreateEventModal()">Cancel</button>
+                <button class="modal-btn primary" onclick="createEventFromModal()">Create Event</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBaH3G-pi_EJO1Tm3TgWd5OyKNVMeBRYbE",
+            authDomain: "hosting-planner.firebaseapp.com",
+            projectId: "hosting-planner",
+            storageBucket: "hosting-planner.firebasestorage.app",
+            messagingSenderId: "683788680917",
+            appId: "1:683788680917:web:50142077cf29e05c2bec5c",
+            measurementId: "G-61MCDEBJ5N"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        
+        // Guest list - starts empty, users will add guests
+        let guestList = [];
+        
+        // Items needed for the event
+        let bringItems = [];
+        
+        // State management
+        let rsvpData = {};
+        let bringData = {};
+        let currentHost = '';
+        let currentDate = '';
+        let currentEventName = 'Hosting Planner';
+        let currentAddress = '';
+        let currentEventId = null;
+        let currentEventPassword = null;
+        let additionalGuests = [];
+        let currentFilter = null; // 'attending', 'pending', 'not-attending', or null
+        
+        // Initialize family member RSVPs (empty by default - will be populated from user input)
+        // familyMembers will be replaced by user-added guests
+        
+        // Firebase Functions
+        function updateSyncStatus(status) {
+            const statusEl = document.getElementById('sync-status');
+            
+            switch(status) {
+                case 'online':
+                    statusEl.textContent = '🟢 Live';
+                    statusEl.className = 'sync-status sync-online';
+                    break;
+                case 'saving':
+                    statusEl.textContent = '🟡 Saving...';
+                    statusEl.className = 'sync-status sync-saving';
+                    break;
+                case 'offline':
+                default:
+                    statusEl.textContent = '🔴 Offline';
+                    statusEl.className = 'sync-status sync-offline';
+                    break;
+            }
+        }
+        
+        async function saveStateToFirebase() {
+            updateSyncStatus('saving');
+            
+            try {
+                const state = {
+                    rsvpData,
+                    bringData,
+                    currentHost,
+                    currentDate,
+                    currentEventName,
+                    currentAddress,
+                    bringItems,
+                    additionalGuests,
+                    guestList,
+                    password: currentEventPassword,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                if (currentEventId) {
+                    await db.collection('events').doc(currentEventId).set(state);
+                } else {
+                    console.error('No event ID available for saving');
+                }
+                updateSyncStatus('online');
+                console.log('✅ State saved to Firebase');
+            } catch (error) {
+                console.error('❌ Failed to save to Firebase:', error);
+                updateSyncStatus('offline');
+            }
+        }
+        
+        async function loadStateFromFirebase() {
+            try {
+                if (!currentEventId) {
+                    console.error('No event ID provided');
+                    return;
+                }
+                
+                const doc = await db.collection('events').doc(currentEventId).get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    
+                    // Load data from Firebase
+                    if (data.rsvpData) rsvpData = data.rsvpData;
+                    if (data.bringData) bringData = data.bringData;
+                    if (data.currentHost) currentHost = data.currentHost;
+                    if (data.currentDate) currentDate = data.currentDate;
+                    if (data.currentEventName) currentEventName = data.currentEventName;
+                    if (data.eventName) currentEventName = data.eventName; // Support both field names
+                    if (data.currentAddress) currentAddress = data.currentAddress;
+                    if (data.password) currentEventPassword = data.password;
+                    if (data.bringItems) bringItems = data.bringItems;
+                    if (data.additionalGuests) additionalGuests = data.additionalGuests;
+                    if (data.guestList) guestList = data.guestList;
+                    
+                    // Ensure all guests have proper RSVP data
+                    guestList.forEach(guest => {
+                        if (!rsvpData[guest]) {
+                            rsvpData[guest] = { status: 'pending', guests: 1, previousGuests: 1 };
+                        } else {
+                            if (rsvpData[guest].previousGuests === undefined) {
+                                rsvpData[guest].previousGuests = rsvpData[guest].guests || 1;
+                            }
+                        }
+                    });
+                    
+                    initializeBringData();
+                    updateDisplay();
+                    updateSyncStatus('online');
+                    console.log('✅ State loaded from Firebase');
+                } else {
+                    // No existing data, create initial state
+                    await saveStateToFirebase();
+                }
+            } catch (error) {
+                console.error('❌ Failed to load from Firebase:', error);
+                updateSyncStatus('offline');
+            }
+        }
+        
+        function setupRealtimeSync() {
+            if (!currentEventId) return;
+            
+            db.collection('events').doc(currentEventId).onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    
+                    // Update state with Firebase data
+                    if (data.rsvpData) rsvpData = data.rsvpData;
+                    if (data.bringData) bringData = data.bringData;
+                    if (data.currentHost) currentHost = data.currentHost;
+                    if (data.currentDate) currentDate = data.currentDate;
+                    if (data.currentEventName) currentEventName = data.currentEventName;
+                    if (data.eventName) currentEventName = data.eventName; // Support both field names
+                    if (data.currentAddress) currentAddress = data.currentAddress;
+                    if (data.password) currentEventPassword = data.password;
+                    if (data.bringItems) bringItems = data.bringItems;
+                    if (data.additionalGuests) additionalGuests = data.additionalGuests;
+                    if (data.guestList) guestList = data.guestList;
+                    
+                    // Ensure all guests have proper RSVP data
+                    guestList.forEach(guest => {
+                        if (!rsvpData[guest]) {
+                            rsvpData[guest] = { status: 'pending', guests: 1, previousGuests: 1 };
+                        } else {
+                            if (rsvpData[guest].previousGuests === undefined) {
+                                rsvpData[guest].previousGuests = rsvpData[guest].guests || 1;
+                            }
+                        }
+                    });
+                    
+                    initializeBringData();
+                    updateDisplay();
+                    updateSyncStatus('online');
+                    console.log('🔄 Real-time update received');
+                }
+            }, (error) => {
+                console.error('❌ Real-time sync error:', error);
+                updateSyncStatus('offline');
+            });
+        }
+        
+        // Initialize bring items
+        function initializeBringData() {
+            bringItems.forEach(item => {
+                if (!bringData[item]) {
+                    bringData[item] = { assigned: false, person: null };
+                }
+            });
+        }
+        
+        function getCurrentHost() {
+            return currentHost || '';
+        }
+        
+        function updateHost(value) {
+            currentHost = value;
+            saveStateToFirebase();
+        }
+        
+        function updateEventName(value) {
+            currentEventName = value;
+            saveStateToFirebase();
+        }
+        
+        function updateAddress(value) {
+            currentAddress = value;
+            saveStateToFirebase();
+        }
+        
+        function getEventDate() {
+            if (currentDate) {
+                const dateObj = new Date(currentDate);
+                return `📅 ${dateObj.toLocaleDateString('en-AU', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                })}`;
+            }
+            return '📅 No date set';
+        }
+        
+        function updateDisplay() {
+            // Update date and host
+            document.getElementById('current-date').textContent = getEventDate();
+            document.getElementById('current-host').value = getCurrentHost();
+            document.getElementById('event-name').value = currentEventName;
+            document.getElementById('current-address').value = currentAddress;
+            
+            // Update page title
+            document.title = currentEventName || 'Hosting Planner';
+            
+            // Update RSVP list
+            updateRSVPList();
+            updateGuestSummary();
+            updateBringList();
+        }
+        
+        function updateRSVPList() {
+            const rsvpContainer = document.getElementById('rsvp-list');
+            rsvpContainer.innerHTML = '';
+            
+            // Display guest list
+            guestList.forEach(guest => {
+                const memberData = rsvpData[guest] || { status: 'pending', guests: 1, previousGuests: 1 };
+                const rsvpRow = document.createElement('div');
+                rsvpRow.className = `rsvp-grid guest-row ${getFilterClass(memberData.status)}`;
+                
+                // Escape quotes in guest name for JavaScript
+                const escapedGuest = guest.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                
+                rsvpRow.innerHTML = `
+                    <div class="family-member" style="display: flex; align-items: center;">
+                        <span onclick="editGuestName(${guestList.indexOf(guest)})" style="cursor: pointer; text-decoration: underline; text-decoration-style: dotted;">${guest}</span>
+                        <button onclick="removeGuest(${guestList.indexOf(guest)})" style="margin-left: auto; background: none; border: none; color: #e53e3e; cursor: pointer; font-size: 16px;">×</button>
+                    </div>
+                    <input type="number" 
+                           class="guest-count" 
+                           value="${memberData.guests}" 
+                           min="1" 
+                           max="50"
+                           onchange="updateGuestCount('${escapedGuest}', this.value)"
+                           ${memberData.status !== 'coming' ? 'disabled' : ''}>
+                    <button class="rsvp-btn ${memberData.status === 'coming' ? 'attending' : memberData.status === 'not-coming' ? 'not-attending' : 'pending'}" 
+                            onclick="toggleRSVP('${escapedGuest}')">
+                        ${memberData.status === 'coming' ? 'Attending' : 
+                          memberData.status === 'not-coming' ? 'Can\'t Make It' : 'Pending'}
+                    </button>
+                `;
+                
+                rsvpContainer.appendChild(rsvpRow);
+            });
+            
+            // Display additional guests
+            additionalGuests.forEach((guest, index) => {
+                const rsvpRow = document.createElement('div');
+                rsvpRow.className = `rsvp-grid guest-row ${getFilterClass(guest.status)}`;
+                
+                rsvpRow.innerHTML = `
+                    <div class="family-member" style="display: flex; align-items: center;">
+                        ${guest.name}
+                        <span style="color: #718096; font-size: 12px; margin-left: 5px;">(guest)</span>
+                        <button onclick="removeAdditionalGuest(${index})" style="margin-left: auto; background: none; border: none; color: #e53e3e; cursor: pointer; font-size: 16px;">×</button>
+                    </div>
+                    <input type="number" 
+                           class="guest-count" 
+                           value="${guest.guests || 1}" 
+                           min="1" 
+                           max="10"
+                           onchange="updateAdditionalGuestCount(${index}, this.value)"
+                           ${guest.status !== 'coming' ? 'disabled' : ''}>
+                    <button class="rsvp-btn ${guest.status === 'coming' ? 'attending' : guest.status === 'not-coming' ? 'not-attending' : 'pending'}" 
+                            onclick="toggleAdditionalGuestStatus(${index})">
+                        ${guest.status === 'coming' ? 'Attending' : 
+                          guest.status === 'not-coming' ? 'Can\'t Make It' : 'Pending'}
+                    </button>
+                `;
+                
+                rsvpContainer.appendChild(rsvpRow);
+            });
+            
+            // Show Add Guests button if no guests or at the bottom
+            if (guestList.length === 0 && additionalGuests.length === 0) {
+                rsvpContainer.innerHTML = `
+                    <div style="padding: 30px 20px; text-align: center;">
+                        <p style="color: #718096; margin-bottom: 15px;">No guests added yet</p>
+                        <button class="edit-btn" onclick="showAddGuestsModal()" style="padding: 10px 20px;">
+                            ➕ Add Guests
+                        </button>
+                    </div>
+                `;
+            } else {
+                // Add "Add Guests" button at the bottom
+                const addGuestsBtn = document.createElement('div');
+                addGuestsBtn.style.cssText = 'padding: 15px 20px; text-align: center;';
+                addGuestsBtn.innerHTML = `
+                    <button class="edit-btn" onclick="showAddGuestsModal()" style="width: 100%;">
+                        ➕ Add Guests
+                    </button>
+                `;
+                rsvpContainer.appendChild(addGuestsBtn);
+            }
+        }
+        
+        function toggleRSVP(member) {
+            const current = rsvpData[member].status;
+            
+            if (current === 'pending') {
+                rsvpData[member].status = 'coming';
+                // Restore previous guest count when switching to coming
+                rsvpData[member].guests = rsvpData[member].previousGuests || 1;
+            } else if (current === 'coming') {
+                // Store current guest count before switching away from coming
+                rsvpData[member].previousGuests = rsvpData[member].guests;
+                rsvpData[member].status = 'not-coming';
+                rsvpData[member].guests = 0;
+            } else if (current === 'not-coming') {
+                rsvpData[member].status = 'pending';
+                rsvpData[member].guests = 0;
+            }
+            
+            updateDisplay();
+            saveStateToFirebase();
+        }
+        
+        function updateGuestCount(member, count) {
+            const newCount = parseInt(count) || 1;
+            rsvpData[member].guests = newCount;
+            // Store as previous count for when they switch status
+            if (rsvpData[member].status === 'coming') {
+                rsvpData[member].previousGuests = newCount;
+            }
+            updateGuestSummary();
+            saveStateToFirebase();
+        }
+        
+        function updateGuestSummary() {
+            const mainGuests = guestList
+                .filter(guest => rsvpData[guest] && rsvpData[guest].status === 'coming')
+                .reduce((sum, guest) => sum + (rsvpData[guest].guests || 0), 0);
+            
+            const additionalGuestsTotal = additionalGuests
+                .filter(g => g.status === 'coming')
+                .reduce((sum, guest) => sum + (guest.guests || 1), 0);
+            
+            const totalGuests = mainGuests + additionalGuestsTotal;
+            
+            // Count total people, not just entries
+            const attendingPeople = guestList
+                .filter(guest => rsvpData[guest] && rsvpData[guest].status === 'coming')
+                .reduce((sum, guest) => sum + (rsvpData[guest].guests || 0), 0);
+            
+            const notAttendingPeople = guestList
+                .filter(guest => rsvpData[guest] && rsvpData[guest].status === 'not-coming')
+                .reduce((sum, guest) => sum + (rsvpData[guest].previousGuests || 1), 0);
+            
+            const pendingPeople = guestList
+                .filter(guest => !rsvpData[guest] || rsvpData[guest].status === 'pending')
+                .reduce((sum, guest) => sum + ((rsvpData[guest] && rsvpData[guest].previousGuests) || 1), 0);
+            
+            const additionalAttendingPeople = additionalGuests
+                .filter(g => g.status === 'coming')
+                .reduce((sum, g) => sum + (g.guests || 1), 0);
+            const additionalNotAttendingPeople = additionalGuests
+                .filter(g => g.status === 'not-coming')
+                .reduce((sum, g) => sum + (g.previousGuests || 1), 0);
+            
+            // Calculate total invited guests regardless of status
+            const totalInvitedGuests = guestList.reduce((sum, guest) => {
+                const guestData = rsvpData[guest] || { previousGuests: 1 };
+                return sum + (guestData.previousGuests || 1);
+            }, 0) + additionalGuests.reduce((sum, guest) => sum + (guest.previousGuests || 1), 0);
+            
+            document.getElementById('guest-summary').innerHTML = `
+                <div class="status-counts">
+                    <div class="status-count ${currentFilter === 'attending' ? 'active' : ''}" onclick="filterGuests('attending')">
+                        <div class="count">${attendingPeople + additionalAttendingPeople}</div>
+                        <div class="label">Attending</div>
+                    </div>
+                    <div class="status-count ${currentFilter === 'pending' ? 'active' : ''}" onclick="filterGuests('pending')">
+                        <div class="count">${pendingPeople}</div>
+                        <div class="label">Pending</div>
+                    </div>
+                    <div class="status-count ${currentFilter === 'not-attending' ? 'active' : ''}" onclick="filterGuests('not-attending')">
+                        <div class="count">${notAttendingPeople + additionalNotAttendingPeople}</div>
+                        <div class="label">Can't Make It</div>
+                    </div>
+                </div>
+                <div style="margin-top: 10px; font-size: 16px;">
+                    <strong>${totalInvitedGuests} total guests invited</strong>
+                </div>
+            `;
+        }
+        
+        function updateBringList() {
+            const bringContainer = document.getElementById('bring-list');
+            bringContainer.innerHTML = '';
+            
+            if (bringItems.length === 0) {
+                // Show "Add Items" button when list is empty
+                bringContainer.innerHTML = `
+                    <div style="padding: 30px 20px; text-align: center;">
+                        <p style="color: #718096; margin-bottom: 15px;">No items added yet</p>
+                        <button class="edit-btn" onclick="editItems()" style="padding: 10px 20px;">
+                            ➕ Add Items
+                        </button>
+                    </div>
+                `;
+            } else {
+                bringItems.forEach((item, index) => {
+                    const itemData = bringData[item];
+                    const itemRow = document.createElement('div');
+                    itemRow.className = 'bring-item';
+                    itemRow.draggable = true;
+                    itemRow.dataset.index = index;
+                    
+                    // Escape quotes in item name
+                    const escapedItem = item.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                    
+                    itemRow.innerHTML = `
+                        <div style="display: flex; align-items: center; flex: 1;">
+                            <span class="drag-handle">☰</span>
+                            <div class="item-name" onclick="editItemName('${escapedItem}')" style="cursor: pointer; text-decoration: underline; text-decoration-style: dotted;">${item}</div>
+                        </div>
+                        <div class="item-status ${itemData.assigned ? 'item-covered' : 'item-needed'}"
+                             onclick="claimItem('${escapedItem}')">
+                            ${itemData.assigned ? `✓ ${itemData.person} (tap to change)` : 'Tap to claim'}
+                        </div>
+                    `;
+                    
+                    // Add drag event listeners
+                    itemRow.addEventListener('dragstart', handleDragStart);
+                    itemRow.addEventListener('dragover', handleDragOver);
+                    itemRow.addEventListener('drop', handleDrop);
+                    itemRow.addEventListener('dragend', handleDragEnd);
+                    
+                    bringContainer.appendChild(itemRow);
+                });
+            }
+        }
+        
+        function claimItem(item) {
+            // Show selection modal
+            document.getElementById('modal-title').textContent = `Who will bring ${item}?`;
+            const personList = document.getElementById('person-list');
+            personList.innerHTML = '';
+            
+            // Show all guests who are attending
+            const attendingGuests = [...guestList.filter(g => rsvpData[g] && rsvpData[g].status === 'coming'),
+                                   ...additionalGuests.filter(g => g.status === 'coming').map(g => g.name)];
+            
+            if (attendingGuests.length === 0) {
+                personList.innerHTML = '<p style="text-align: center; color: #718096;">No confirmed guests yet</p>';
+            } else {
+                attendingGuests.forEach(person => {
+                    const btn = document.createElement('button');
+                    btn.className = 'person-btn';
+                    btn.textContent = person;
+                    btn.onclick = () => {
+                        bringData[item] = { assigned: true, person: person };
+                        updateBringList();
+                        closeModal();
+                        saveStateToFirebase();
+                    };
+                    personList.appendChild(btn);
+                });
+            }
+            
+            document.getElementById('selection-modal').style.display = 'flex';
+        }
+        
+        function closeModal() {
+            document.getElementById('selection-modal').style.display = 'none';
+        }
+        
+        function editItems() {
+            updateEditList();
+            document.getElementById('edit-modal').style.display = 'flex';
+        }
+        
+        function updateEditList() {
+            const editList = document.getElementById('edit-list');
+            editList.innerHTML = '';
+            
+            bringItems.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'edit-item';
+                // Escape quotes in item name
+                const escapedItem = item.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                itemDiv.innerHTML = `
+                    <span>${item}</span>
+                    <button class="remove-btn" onclick="removeItem('${escapedItem}')">Remove</button>
+                `;
+                editList.appendChild(itemDiv);
+            });
+        }
+        
+        function removeItem(item) {
+            if (confirm(`Remove "${item}" from the list?`)) {
+                bringItems = bringItems.filter(i => i !== item);
+                delete bringData[item];
+                updateEditList();
+                updateBringList();
+                saveStateToFirebase();
+            }
+        }
+        
+        function addNewItem() {
+            const input = document.getElementById('new-item-input');
+            const newItem = input.value.trim();
+            if (newItem && !bringItems.includes(newItem)) {
+                bringItems.push(newItem);
+                bringData[newItem] = { assigned: false, person: null };
+                input.value = '';
+                updateEditList();
+                updateBringList();
+                saveStateToFirebase();
+            }
+        }
+        
+        function closeEditModal() {
+            document.getElementById('edit-modal').style.display = 'none';
+        }
+        
+        // Host editing is now handled by the text input directly
+        
+        function editDate() {
+            // Pre-fill with current date or next Saturday
+            const dateInput = document.getElementById('date-input');
+            if (currentDate) {
+                dateInput.value = currentDate;
+            } else {
+                // Set to today's date as default
+                const today = new Date();
+                dateInput.value = today.toISOString().split('T')[0];
+            }
+            
+            document.getElementById('date-modal').style.display = 'flex';
+        }
+        
+        function saveDate() {
+            const dateInput = document.getElementById('date-input');
+            if (dateInput.value) {
+                currentDate = dateInput.value;
+                updateDisplay();
+                saveStateToFirebase();
+            }
+            closeDateModal();
+        }
+        
+        function closeDateModal() {
+            document.getElementById('date-modal').style.display = 'none';
+        }
+        
+        function showAddGuestsModal() {
+            document.getElementById('guest-name-input').value = '';
+            document.getElementById('guest-name-input').focus();
+            document.getElementById('guests-modal').style.display = 'flex';
+        }
+        
+        function closeGuestsModal() {
+            document.getElementById('guests-modal').style.display = 'none';
+        }
+        
+        function addGuest() {
+            const input = document.getElementById('guest-name-input');
+            const guestsText = input.value.trim();
+            
+            if (!guestsText) return;
+            
+            // Parse the comma-separated list of guests
+            const guestEntries = guestsText.split(',').map(entry => entry.trim()).filter(entry => entry);
+            
+            guestEntries.forEach(entry => {
+                const match = entry.match(/^(.+?)\s*-\s*(\d+)$/);
+                let guestName, guestCount;
+                
+                if (match) {
+                    guestName = match[1].trim();
+                    guestCount = parseInt(match[2]);
+                } else {
+                    guestName = entry.trim();
+                    guestCount = 1;
+                }
+                
+                // Check if guest already exists
+                if (!guestList.includes(guestName)) {
+                    // Add to main guest list
+                    guestList.push(guestName);
+                    rsvpData[guestName] = { status: 'pending', guests: guestCount, previousGuests: guestCount };
+                }
+            });
+            
+            input.value = '';
+            closeGuestsModal();
+            updateRSVPList();
+            updateGuestSummary();
+            saveStateToFirebase();
+        }
+        
+        
+        function toggleAdditionalGuestStatus(index) {
+            const guest = additionalGuests[index];
+            
+            if (guest.status === 'coming') {
+                // Store current guest count before switching away from coming
+                guest.previousGuests = guest.guests;
+                guest.status = 'not-coming';
+                guest.guests = 0;
+            } else if (guest.status === 'not-coming') {
+                guest.status = 'pending';
+                guest.guests = 0;
+            } else {
+                guest.status = 'coming';
+                // Restore previous guest count when switching to coming
+                guest.guests = guest.previousGuests || 1;
+            }
+            
+            updateRSVPList();
+            updateGuestSummary();
+            saveStateToFirebase();
+        }
+        
+        function removeAdditionalGuest(index) {
+            if (confirm('Remove this guest?')) {
+                additionalGuests.splice(index, 1);
+                updateRSVPList();
+                updateGuestSummary();
+                saveStateToFirebase();
+            }
+        }
+        
+        function updateAdditionalGuestCount(index, count) {
+            const newCount = parseInt(count) || 1;
+            additionalGuests[index].guests = newCount;
+            // Store as previous count for when they switch status
+            if (additionalGuests[index].status === 'coming') {
+                additionalGuests[index].previousGuests = newCount;
+            }
+            updateGuestSummary();
+            saveStateToFirebase();
+        }
+        
+        function editItemName(oldName) {
+            const newName = prompt(`Edit item name:`, oldName);
+            if (newName && newName.trim() && newName !== oldName) {
+                const trimmedName = newName.trim();
+                
+                // Check if new name already exists
+                if (bringItems.includes(trimmedName)) {
+                    alert('An item with this name already exists!');
+                    return;
+                }
+                
+                // Update the item name in bringItems array
+                const index = bringItems.indexOf(oldName);
+                if (index > -1) {
+                    bringItems[index] = trimmedName;
+                }
+                
+                // Move the data from old key to new key
+                bringData[trimmedName] = bringData[oldName];
+                delete bringData[oldName];
+                
+                // Update the display and save
+                updateBringList();
+                saveStateToFirebase();
+            }
+        }
+        
+        function editGuestName(index) {
+            const oldName = guestList[index];
+            const newName = prompt(`Edit guest name:`, oldName);
+            if (newName && newName.trim() && newName !== oldName) {
+                const trimmedName = newName.trim();
+                
+                // Check if new name already exists
+                if (guestList.includes(trimmedName)) {
+                    alert('A guest with this name already exists!');
+                    return;
+                }
+                
+                // Update the guest name in guestList array
+                guestList[index] = trimmedName;
+                
+                // Move the RSVP data from old key to new key
+                rsvpData[trimmedName] = rsvpData[oldName];
+                delete rsvpData[oldName];
+                
+                // Update any bring items assigned to this person
+                Object.keys(bringData).forEach(item => {
+                    if (bringData[item].person === oldName) {
+                        bringData[item].person = trimmedName;
+                    }
+                });
+                
+                // Update the display and save
+                updateDisplay();
+                saveStateToFirebase();
+            }
+        }
+        
+        function removeGuest(index) {
+            const guestName = guestList[index];
+            if (confirm(`Remove ${guestName} from the guest list?`)) {
+                // Remove from guest list
+                guestList.splice(index, 1);
+                
+                // Remove RSVP data
+                delete rsvpData[guestName];
+                
+                // Unassign any items they were bringing
+                Object.keys(bringData).forEach(item => {
+                    if (bringData[item].person === guestName) {
+                        bringData[item] = { assigned: false, person: null };
+                    }
+                });
+                
+                // Update the display and save
+                updateDisplay();
+                saveStateToFirebase();
+            }
+        }
+        
+        function getFilterClass(status) {
+            if (currentFilter === null) return '';
+            
+            const statusMap = {
+                'coming': 'attending',
+                'not-coming': 'not-attending',
+                'pending': 'pending'
+            };
+            
+            return currentFilter === statusMap[status] ? '' : 'hidden';
+        }
+        
+        function filterGuests(filterType) {
+            if (currentFilter === filterType) {
+                // Already filtered by this type, remove filter
+                currentFilter = null;
+            } else {
+                // Apply new filter
+                currentFilter = filterType;
+            }
+            
+            // Update the display to show/hide guests
+            updateRSVPList();
+            updateGuestSummary();
+        }
+        
+        // Drag and drop variables
+        let draggedItemIndex = null;
+        
+        function handleDragStart(e) {
+            draggedItemIndex = parseInt(e.target.dataset.index);
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+        
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+        
+        function handleDrop(e) {
+            e.preventDefault();
+            const dropIndex = parseInt(e.target.closest('.bring-item').dataset.index);
+            
+            if (draggedItemIndex !== null && draggedItemIndex !== dropIndex) {
+                // Reorder the items array
+                const draggedItem = bringItems[draggedItemIndex];
+                bringItems.splice(draggedItemIndex, 1);
+                bringItems.splice(dropIndex, 0, draggedItem);
+                
+                // Update display and save
+                updateBringList();
+                saveStateToFirebase();
+            }
+        }
+        
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            draggedItemIndex = null;
+        }
+        
+        async function shareSummary() {
+            const host = getCurrentHost();
+            const date = getEventDate();
+            const coming = guestList.filter(g => rsvpData[g] && rsvpData[g].status === 'coming');
+            const mainGuests = coming.reduce((sum, guest) => sum + (rsvpData[guest].guests || 0), 0);
+            const additionalGuestsTotal = additionalGuests
+                .filter(g => g.status === 'coming')
+                .reduce((sum, guest) => sum + (guest.guests || 1), 0);
+            const totalGuests = mainGuests + additionalGuestsTotal;
+            
+            const coveredItems = bringItems
+                .filter(item => bringData[item].assigned)
+                .map(item => `${item}: ${bringData[item].person}`)
+                .join('\n');
+            
+            const neededItems = bringItems
+                .filter(item => !bringData[item].assigned)
+                .join(', ');
+            
+            const baseURL = `${window.location.origin}${window.location.pathname}`;
+            
+            let message = `📅 *Event Planning*\n\n`;
+            message += `📅 *Date:* ${date}\n`;
+            message += `🏠 *Host(s):* ${host || 'TBD'}\n`;
+            const totalAttending = coming.length + additionalGuests.filter(g => g.status === 'coming').length;
+            message += `👥 *${totalGuests} guests* (${totalAttending} confirmed)\n\n`;
+            
+            if (coveredItems) {
+                message += `✅ *Bringing:*\n${coveredItems}\n\n`;
+            }
+            
+            if (neededItems) {
+                message += `❓ *Still needed:* ${neededItems}\n\n`;
+            }
+            
+            message += `🔗 RSVP & update: ${baseURL}`;
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(message).then(() => {
+                alert('📱 Summary copied to clipboard!\nShare via your preferred messaging app.');
+            }).catch(() => {
+                alert('Summary ready:\n\n' + message);
+            });
+        }
+        
+        // Get event ID from URL
+        function getEventIdFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('id');
+        }
+        
+        // Check if password is required and correct
+        async function checkEventAccess() {
+            if (!currentEventId) {
+                alert('Invalid event URL');
+                window.location.href = 'index.html';
+                return false;
+            }
+            
+            try {
+                const doc = await db.collection('events').doc(currentEventId).get();
+                
+                if (!doc.exists) {
+                    alert('Event not found');
+                    window.location.href = 'index.html';
+                    return false;
+                }
+                
+                const eventData = doc.data();
+                currentEventPassword = eventData.password;
+                
+                if (currentEventPassword) {
+                    // Check if password was provided or stored
+                    const storedPassword = sessionStorage.getItem(`eventPassword_${currentEventId}`);
+                    if (storedPassword !== currentEventPassword) {
+                        showPasswordModal();
+                        return false;
+                    }
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Error checking event access:', error);
+                alert('Failed to load event');
+                window.location.href = 'index.html';
+                return false;
+            }
+        }
+        
+        function showPasswordModal() {
+            document.getElementById('password-modal').style.display = 'flex';
+            document.getElementById('password-input').focus();
+        }
+        
+        function checkPassword() {
+            const enteredPassword = document.getElementById('password-input').value;
+            
+            if (enteredPassword === currentEventPassword) {
+                // Store password in session
+                sessionStorage.setItem(`eventPassword_${currentEventId}`, enteredPassword);
+                document.getElementById('password-modal').style.display = 'none';
+                document.getElementById('password-input').value = '';
+                initializeApp();
+            } else {
+                alert('Incorrect password');
+                document.getElementById('password-input').value = '';
+                document.getElementById('password-input').focus();
+            }
+        }
+        
+        function createNewEvent() {
+            showCreateEventModal();
+        }
+        
+        function showCreateEventModal() {
+            // Set default date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('event-date-input').value = today;
+            
+            document.getElementById('create-event-modal').style.display = 'flex';
+            document.getElementById('event-name-input').focus();
+        }
+        
+        function closeCreateEventModal() {
+            document.getElementById('create-event-modal').style.display = 'none';
+            // Clear form
+            document.getElementById('event-name-input').value = '';
+            document.getElementById('event-date-input').value = '';
+            document.getElementById('event-host-input').value = '';
+            document.getElementById('event-address-input').value = '';
+            document.getElementById('initial-guests-input').value = '';
+            document.getElementById('initial-items-input').value = '';
+            document.getElementById('event-password-input').value = '';
+        }
+        
+        function generateEventId(eventName) {
+            // Create URL-friendly slug from event name
+            const slug = eventName.toLowerCase()
+                .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+                .replace(/\s+/g, '-') // Replace spaces with hyphens
+                .substring(0, 30); // Limit length
+            
+            // Generate random 6-character code
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            
+            return `${slug}-${code}`;
+        }
+        
+        function parseGuestList(guestsText) {
+            if (!guestsText.trim()) return [];
+            
+            const guestEntries = guestsText.split(',').map(entry => entry.trim()).filter(entry => entry);
+            const guests = [];
+            
+            guestEntries.forEach(entry => {
+                const match = entry.match(/^(.+?)\s*-\s*(\d+)$/);
+                if (match) {
+                    guests.push({
+                        name: match[1].trim(),
+                        count: parseInt(match[2])
+                    });
+                } else {
+                    guests.push({
+                        name: entry.trim(),
+                        count: 1
+                    });
+                }
+            });
+            
+            return guests;
+        }
+        
+        async function createEventFromModal() {
+            const eventName = document.getElementById('event-name-input').value.trim();
+            const eventDate = document.getElementById('event-date-input').value;
+            const eventHost = document.getElementById('event-host-input').value.trim();
+            const eventAddress = document.getElementById('event-address-input').value.trim();
+            const guestsText = document.getElementById('initial-guests-input').value.trim();
+            const itemsText = document.getElementById('initial-items-input').value.trim();
+            const password = document.getElementById('event-password-input').value;
+            
+            if (!eventName || !eventDate) {
+                alert('Please fill in the event name and date.');
+                return;
+            }
+            
+            try {
+                const eventId = generateEventId(eventName);
+                const guests = parseGuestList(guestsText);
+                const items = itemsText ? itemsText.split(',').map(item => item.trim()).filter(item => item) : [];
+                
+                // Prepare guest data
+                const guestList = guests.map(g => g.name);
+                const rsvpData = {};
+                guests.forEach(guest => {
+                    rsvpData[guest.name] = {
+                        status: 'pending',
+                        guests: guest.count,
+                        previousGuests: guest.count
+                    };
+                });
+                
+                // Prepare bring data
+                const bringData = {};
+                items.forEach(item => {
+                    bringData[item] = { assigned: false, person: null };
+                });
+                
+                const eventData = {
+                    eventId,
+                    eventName,
+                    currentDate: eventDate,
+                    currentHost: eventHost,
+                    currentAddress: eventAddress,
+                    guestList,
+                    rsvpData,
+                    bringItems: items,
+                    bringData,
+                    additionalGuests: [],
+                    password: password || null,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection('events').doc(eventId).set(eventData);
+                
+                // Redirect to the new event page
+                window.location.href = `event.html?id=${eventId}`;
+                
+            } catch (error) {
+                console.error('Error creating event:', error);
+                alert('Failed to create event. Please try again.');
+            }
+        }
+        
+        // Initialize the app
+        async function initializeApp() {
+            updateSyncStatus('offline');
+            
+            // Check if we have access to this event
+            const hasAccess = await checkEventAccess();
+            if (!hasAccess) return;
+            
+            // Load state from Firebase
+            await loadStateFromFirebase();
+            
+            // Set up real-time sync
+            setupRealtimeSync();
+            
+            // Initialize and display
+            initializeBringData();
+            updateDisplay();
+        }
+        
+        // Start the app
+        window.addEventListener('load', () => {
+            currentEventId = getEventIdFromUrl();
+            
+            if (!currentEventId) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            initializeApp();
+        });
+        
+        // Close modals when clicking outside
+        document.getElementById('selection-modal').onclick = function(e) {
+            if (e.target === this) closeModal();
+        }
+        
+        document.getElementById('edit-modal').onclick = function(e) {
+            if (e.target === this) closeEditModal();
+        }
+        
+        
+        document.getElementById('date-modal').onclick = function(e) {
+            if (e.target === this) closeDateModal();
+        }
+        
+        document.getElementById('guests-modal').onclick = function(e) {
+            if (e.target === this) closeGuestsModal();
+        }
+        
+        document.getElementById('create-event-modal').onclick = function(e) {
+            if (e.target === this) closeCreateEventModal();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hosting Planner</title>
+    
+    <!-- Firebase Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
+    
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="landing-container">
+        <div class="landing-header">
+            <h1>📅 Hosting Planner</h1>
+            <p>Plan and coordinate your events with ease</p>
+        </div>
+        
+        <div class="landing-content">
+            <div class="cta-section">
+                <button class="create-event-btn" onclick="showCreateEventModal()">
+                    ✨ Create New Event
+                </button>
+                <p class="cta-subtitle">Get started in just a few clicks</p>
+            </div>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">👥</div>
+                    <h3>Guest Management</h3>
+                    <p>Track RSVPs and guest counts in real-time</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🍽️</div>
+                    <h3>Food Coordination</h3>
+                    <p>Organize who brings what with ease</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <h3>Real-time Sync</h3>
+                    <p>Everyone sees updates instantly</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📱</div>
+                    <h3>Easy Sharing</h3>
+                    <p>Share updates via any messaging app</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Event Modal -->
+    <div class="modal" id="create-event-modal">
+        <div class="modal-content large-modal">
+            <h3>Create New Event</h3>
+            
+            <div class="form-section">
+                <label for="event-name-input">Event Name *</label>
+                <input type="text" id="event-name-input" placeholder="e.g., Birthday Party, Team Dinner" required>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-section">
+                    <label for="event-date-input">Date *</label>
+                    <input type="date" id="event-date-input" required>
+                </div>
+                <div class="form-section">
+                    <label for="event-host-input">Host(s)</label>
+                    <input type="text" id="event-host-input" placeholder="Who's hosting?">
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <label for="event-address-input">Address</label>
+                <input type="text" id="event-address-input" placeholder="Event location">
+            </div>
+            
+            <div class="form-section">
+                <label for="initial-guests-input">Initial Guests (optional)</label>
+                <input type="text" id="initial-guests-input" placeholder="e.g., John, Sarah's Family - 5, Mike, The Smiths - 8">
+                <small>Comma-separated list. Add " - number" for groups (defaults to 1)</small>
+            </div>
+            
+            <div class="form-section">
+                <label for="initial-items-input">Items Needed (optional)</label>
+                <input type="text" id="initial-items-input" placeholder="e.g., Salad, Main dish, Dessert, Drinks">
+                <small>Comma-separated list of items</small>
+            </div>
+            
+            <div class="form-section">
+                <label for="event-password-input">Password Protection (optional)</label>
+                <input type="password" id="event-password-input" placeholder="Leave blank for no password">
+                <small>If set, guests will need this password to access the event</small>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeCreateEventModal()">Cancel</button>
+                <button class="modal-btn primary" onclick="createNewEventFromModal()">Create Event</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Modal -->
+    <div class="modal" id="password-modal">
+        <div class="modal-content">
+            <h3>Password Required</h3>
+            <p>This event is password protected.</p>
+            <input type="password" id="password-input" placeholder="Enter password" onkeypress="if(event.key==='Enter') checkPassword()">
+            <div class="modal-buttons">
+                <button class="modal-btn primary" onclick="checkPassword()">Access Event</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBaH3G-pi_EJO1Tm3TgWd5OyKNVMeBRYbE",
+            authDomain: "hosting-planner.firebaseapp.com",
+            projectId: "hosting-planner",
+            storageBucket: "hosting-planner.firebasestorage.app",
+            messagingSenderId: "683788680917",
+            appId: "1:683788680917:web:50142077cf29e05c2bec5c",
+            measurementId: "G-61MCDEBJ5N"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        
+        function showCreateEventModal() {
+            // Set default date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('event-date-input').value = today;
+            
+            document.getElementById('create-event-modal').style.display = 'flex';
+            document.getElementById('event-name-input').focus();
+        }
+        
+        function closeCreateEventModal() {
+            document.getElementById('create-event-modal').style.display = 'none';
+            // Clear form
+            document.getElementById('event-name-input').value = '';
+            document.getElementById('event-date-input').value = '';
+            document.getElementById('event-host-input').value = '';
+            document.getElementById('event-address-input').value = '';
+            document.getElementById('initial-guests-input').value = '';
+            document.getElementById('initial-items-input').value = '';
+            document.getElementById('event-password-input').value = '';
+        }
+        
+        function generateEventId(eventName) {
+            // Create URL-friendly slug from event name
+            const slug = eventName.toLowerCase()
+                .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+                .replace(/\s+/g, '-') // Replace spaces with hyphens
+                .substring(0, 30); // Limit length
+            
+            // Generate random 6-character code
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            
+            return `${slug}-${code}`;
+        }
+        
+        function parseGuestList(guestsText) {
+            if (!guestsText.trim()) return [];
+            
+            const guestEntries = guestsText.split(',').map(entry => entry.trim()).filter(entry => entry);
+            const guests = [];
+            
+            guestEntries.forEach(entry => {
+                const match = entry.match(/^(.+?)\s*-\s*(\d+)$/);
+                if (match) {
+                    guests.push({
+                        name: match[1].trim(),
+                        count: parseInt(match[2])
+                    });
+                } else {
+                    guests.push({
+                        name: entry.trim(),
+                        count: 1
+                    });
+                }
+            });
+            
+            return guests;
+        }
+        
+        async function createNewEventFromModal() {
+            const eventName = document.getElementById('event-name-input').value.trim();
+            const eventDate = document.getElementById('event-date-input').value;
+            const eventHost = document.getElementById('event-host-input').value.trim();
+            const eventAddress = document.getElementById('event-address-input').value.trim();
+            const guestsText = document.getElementById('initial-guests-input').value.trim();
+            const itemsText = document.getElementById('initial-items-input').value.trim();
+            const password = document.getElementById('event-password-input').value;
+            
+            if (!eventName || !eventDate) {
+                alert('Please fill in the event name and date.');
+                return;
+            }
+            
+            try {
+                const eventId = generateEventId(eventName);
+                const guests = parseGuestList(guestsText);
+                const items = itemsText ? itemsText.split(',').map(item => item.trim()).filter(item => item) : [];
+                
+                // Prepare guest data
+                const guestList = guests.map(g => g.name);
+                const rsvpData = {};
+                guests.forEach(guest => {
+                    rsvpData[guest.name] = {
+                        status: 'pending',
+                        guests: guest.count,
+                        previousGuests: guest.count
+                    };
+                });
+                
+                // Prepare bring data
+                const bringData = {};
+                items.forEach(item => {
+                    bringData[item] = { assigned: false, person: null };
+                });
+                
+                const eventData = {
+                    eventId,
+                    eventName,
+                    currentDate: eventDate,
+                    currentHost: eventHost,
+                    currentAddress: eventAddress,
+                    guestList,
+                    rsvpData,
+                    bringItems: items,
+                    bringData,
+                    additionalGuests: [],
+                    password: password || null,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection('events').doc(eventId).set(eventData);
+                
+                // Redirect to the event page
+                window.location.href = `event.html?id=${eventId}`;
+                
+            } catch (error) {
+                console.error('Error creating event:', error);
+                alert('Failed to create event. Please try again.');
+            }
+        }
+        
+        // Check if we're being redirected to a specific event
+        window.addEventListener('load', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const eventId = urlParams.get('id');
+            
+            if (eventId) {
+                // Redirect to event page
+                window.location.href = `event.html?id=${eventId}`;
+            }
+        });
+        
+        // Close modal when clicking outside
+        document.getElementById('create-event-modal').onclick = function(e) {
+            if (e.target === this) closeCreateEventModal();
+        }
+    </script>
+</body>
+</html>
