@@ -506,13 +506,13 @@ body {
 .landing-header h1 {
     font-size: 3rem;
     margin-bottom: 10px;
-    color: #2d3748;
+    color: #ffffff;
     font-weight: 700;
 }
 
 .landing-header p {
     font-size: 1.2rem;
-    color: #4a5568;
+    color: #ffffff;
 }
 
 .feature-grid {
@@ -580,7 +580,7 @@ body {
 }
 
 .cta-subtitle {
-    color: #4a5568;
+    color: #ffffff;
     margin-top: 15px;
     font-size: 0.9rem;
 }
