@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">Hosting Planner</title>
-    <link rel="icon" type="image/png" href="Favicon.png">
+    <link rel="icon" type="image/png" href="/Favicon.png">
+    <link rel="shortcut icon" href="/Favicon.png">
+    <link rel="apple-touch-icon" href="/Favicon.png">
     
     <!-- Firebase Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
@@ -993,7 +995,7 @@
                 .filter(item => !bringData[item].assigned)
                 .join(', ');
             
-            const baseURL = `${window.location.origin}${window.location.pathname}`;
+            const baseURL = `${window.location.origin}${window.location.pathname}?id=${currentEventId}`;
             
             let message = `📅 *Event Planning*\n\n`;
             message += `📅 *Date:* ${date}\n`;
