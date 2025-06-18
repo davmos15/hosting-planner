@@ -2,6 +2,9 @@
   "name": "hosting-planner",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "python3 -m http.server 8000",
     "dev": "python3 -m http.server 8000",
