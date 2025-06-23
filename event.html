@@ -1569,24 +1569,29 @@
             // Initialize and display
             initializeBringData();
             
-            // For owners, always show full content immediately
-            // For guests, handle based on whether they've visited before
-            if (isEventOwner()) {
-                // Owner always gets full interface
-                updateDisplay();
-            } else if (localStorage.getItem(`guest_name_${currentEventId}`)) {
-                // Returning guest - show restricted view
-                updateDisplay();
-                setTimeout(() => {
-                    showGuestNamePrompt();
-                }, 100);
-            } else {
-                // New guest - hide content and show search modal
-                hidePageContentForGuests();
-                setTimeout(() => {
-                    showGuestNamePrompt();
-                }, 500);
-            }
+            // Wait a moment for auth state to be established
+            setTimeout(() => {
+                // For owners, always show full content immediately
+                // For guests, handle based on whether they've visited before
+                if (isEventOwner()) {
+                    // Owner always gets full interface
+                    updateDisplay();
+                    updateOwnershipUI();
+                    updatePermissionBasedUI();
+                } else if (localStorage.getItem(`guest_name_${currentEventId}`)) {
+                    // Returning guest - show restricted view
+                    updateDisplay();
+                    setTimeout(() => {
+                        showGuestNamePrompt();
+                    }, 100);
+                } else {
+                    // New guest - hide content and show search modal
+                    hidePageContentForGuests();
+                    setTimeout(() => {
+                        showGuestNamePrompt();
+                    }, 500);
+                }
+            }, 200); // Give auth state time to resolve
         }
         
         // Start the app
@@ -2045,7 +2050,9 @@
         }
         
         function isEventOwner() {
-            return currentUser && eventOwner && currentUser.uid === eventOwner;
+            const isOwner = currentUser && eventOwner && currentUser.uid === eventOwner;
+            console.log('Owner check:', { currentUser: currentUser?.uid, eventOwner, isOwner });
+            return isOwner;
         }
         
         function canEditGuests() {
@@ -2261,8 +2268,17 @@
         // Auth state listener
         auth.onAuthStateChanged((user) => {
             updateEventPageAuthUI(user);
-            updateOwnershipUI();
-            updatePermissionBasedUI();
+            
+            // If we have loaded the event data, update UI based on ownership
+            if (eventOwner !== null) {
+                updateOwnershipUI();
+                updatePermissionBasedUI();
+                
+                // Re-render the display to show correct UI for owner vs guest
+                if (currentEventId) {
+                    updateDisplay();
+                }
+            }
         });
         
         document.getElementById('create-event-modal').onclick = function(e) {
