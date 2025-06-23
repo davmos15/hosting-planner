@@ -576,32 +576,70 @@
                 // Escape quotes in guest name for JavaScript
                 const escapedGuest = guest.replace(/'/g, "\\'").replace(/"/g, '\\"');
                 
-                rsvpRow.innerHTML = `
-                    <div class="family-member" style="display: flex; align-items: center;">
-                        <span onclick="editGuestName(${guestList.indexOf(guest)})" style="cursor: pointer; text-decoration: underline; text-decoration-style: dotted;">${guest}</span>
-                        <button onclick="removeGuest(${guestList.indexOf(guest)})" style="margin-left: auto; background: none; border: none; color: #e53e3e; cursor: pointer; font-size: 16px;">×</button>
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <button class="rsvp-btn-new ${memberData.status === 'coming' ? 'active' : ''}" 
-                                onclick="setRSVPStatus('${escapedGuest}', 'coming')" 
-                                style="background: ${memberData.status === 'coming' ? '#48bb78' : '#f7fafc'}; color: ${memberData.status === 'coming' ? 'white' : '#4a5568'}; border: 1px solid ${memberData.status === 'coming' ? '#48bb78' : '#e2e8f0'}; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">
-                            ✓ Yes
-                        </button>
-                        <button class="rsvp-btn-new ${memberData.status === 'not-coming' ? 'active' : ''}" 
-                                onclick="setRSVPStatus('${escapedGuest}', 'not-coming')" 
-                                style="background: ${memberData.status === 'not-coming' ? '#f56565' : '#f7fafc'}; color: ${memberData.status === 'not-coming' ? 'white' : '#4a5568'}; border: 1px solid ${memberData.status === 'not-coming' ? '#f56565' : '#e2e8f0'}; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">
-                            ✗ No
-                        </button>
-                        <input type="number" 
-                               class="guest-count" 
-                               value="${memberData.guests}" 
-                               min="1" 
-                               max="50"
-                               onchange="updateGuestCount('${escapedGuest}', this.value)"
-                               ${memberData.status !== 'coming' ? 'disabled' : ''}
-                               style="width: 50px; margin-left: 8px;">
-                    </div>
-                `;
+                // Different UI for owners vs guests
+                if (isEventOwner()) {
+                    // Owner sees single toggle button + guest count
+                    rsvpRow.innerHTML = `
+                        <div class="family-member" style="display: flex; align-items: center;">
+                            <span onclick="editGuestName(${guestList.indexOf(guest)})" style="cursor: pointer; text-decoration: underline; text-decoration-style: dotted;">${guest}</span>
+                            <button onclick="removeGuest(${guestList.indexOf(guest)})" style="margin-left: auto; background: none; border: none; color: #e53e3e; cursor: pointer; font-size: 16px;">×</button>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="rsvp-btn ${memberData.status === 'coming' ? 'attending' : memberData.status === 'not-coming' ? 'not-attending' : 'pending'}" 
+                                    onclick="toggleRSVP('${escapedGuest}')">
+                                ${memberData.status === 'coming' ? 'Attending' : 
+                                  memberData.status === 'not-coming' ? 'Can\'t Make It' : 'Pending'}
+                            </button>
+                            <input type="number" 
+                                   class="guest-count" 
+                                   value="${memberData.guests}" 
+                                   min="1" 
+                                   max="50"
+                                   onchange="updateGuestCount('${escapedGuest}', this.value)"
+                                   ${memberData.status !== 'coming' ? 'disabled' : ''}
+                                   style="width: 60px;">
+                        </div>
+                    `;
+                } else {
+                    // Guest sees Yes/No buttons (if this is their name) or read-only status
+                    const isCurrentGuest = currentGuestName && guest.toLowerCase() === currentGuestName.toLowerCase();
+                    if (isCurrentGuest) {
+                        rsvpRow.innerHTML = `
+                            <div class="family-member" style="display: flex; align-items: center;">
+                                <span>${guest}</span>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <button class="rsvp-btn-new ${memberData.status === 'coming' ? 'active' : ''}" 
+                                        onclick="setRSVPStatus('${escapedGuest}', 'coming')" 
+                                        style="background: ${memberData.status === 'coming' ? '#48bb78' : '#f7fafc'}; color: ${memberData.status === 'coming' ? 'white' : '#4a5568'}; border: 1px solid ${memberData.status === 'coming' ? '#48bb78' : '#e2e8f0'}; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">
+                                    ✓ Yes
+                                </button>
+                                <button class="rsvp-btn-new ${memberData.status === 'not-coming' ? 'active' : ''}" 
+                                        onclick="setRSVPStatus('${escapedGuest}', 'not-coming')" 
+                                        style="background: ${memberData.status === 'not-coming' ? '#f56565' : '#f7fafc'}; color: ${memberData.status === 'not-coming' ? 'white' : '#4a5568'}; border: 1px solid ${memberData.status === 'not-coming' ? '#f56565' : '#e2e8f0'}; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">
+                                    ✗ No
+                                </button>
+                                <input type="number" 
+                                       class="guest-count" 
+                                       value="${memberData.guests}" 
+                                       min="1" 
+                                       max="50"
+                                       onchange="updateGuestCount('${escapedGuest}', this.value)"
+                                       ${memberData.status !== 'coming' ? 'disabled' : ''}
+                                       style="width: 50px; margin-left: 8px;">
+                            </div>
+                        `;
+                    } else {
+                        // Other guests show read-only status
+                        rsvpRow.innerHTML = `
+                            <div class="family-member">${guest}</div>
+                            <div style="padding: 6px 12px; background: ${memberData.status === 'coming' ? '#e6fffa' : memberData.status === 'not-coming' ? '#fed7d7' : '#f7fafc'}; border-radius: 6px; font-size: 12px;">
+                                ${memberData.status === 'coming' ? '✓ Attending (' + memberData.guests + ')' : 
+                                  memberData.status === 'not-coming' ? '✗ Can\'t make it' : '⏳ Pending'}
+                            </div>
+                        `;
+                    }
+                }
                 
                 rsvpContainer.appendChild(rsvpRow);
             });
@@ -611,46 +649,88 @@
                 (isGuestUser ? additionalGuests.filter(guest => guest.name.toLowerCase() === currentGuestName.toLowerCase()) : []);
             
             // Display additional guests
-            additionalGuestsToShow.forEach((guest, index) => {
+            additionalGuestsToShow.forEach((guest, displayIndex) => {
+                // Find the actual index in the full additionalGuests array
+                const actualIndex = additionalGuests.findIndex(g => g.name === guest.name);
+                const index = actualIndex >= 0 ? actualIndex : displayIndex;
                 const rsvpRow = document.createElement('div');
                 rsvpRow.className = `rsvp-grid guest-row ${getFilterClass(guest.status)}`;
                 
-                rsvpRow.innerHTML = `
-                    <div class="family-member" style="display: flex; align-items: center;">
-                        ${guest.name}
-                        <span style="color: #718096; font-size: 12px; margin-left: 5px;">(guest)</span>
-                        <button onclick="removeAdditionalGuest(${index})" style="margin-left: auto; background: none; border: none; color: #e53e3e; cursor: pointer; font-size: 16px;">×</button>
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <button class="rsvp-btn-new ${guest.status === 'coming' ? 'active' : ''}" 
-                                onclick="setAdditionalGuestStatus(${index}, 'coming')" 
-                                style="background: ${guest.status === 'coming' ? '#48bb78' : '#f7fafc'}; color: ${guest.status === 'coming' ? 'white' : '#4a5568'}; border: 1px solid ${guest.status === 'coming' ? '#48bb78' : '#e2e8f0'}; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">
-                            ✓ Yes
-                        </button>
-                        <button class="rsvp-btn-new ${guest.status === 'not-coming' ? 'active' : ''}" 
-                                onclick="setAdditionalGuestStatus(${index}, 'not-coming')" 
-                                style="background: ${guest.status === 'not-coming' ? '#f56565' : '#f7fafc'}; color: ${guest.status === 'not-coming' ? 'white' : '#4a5568'}; border: 1px solid ${guest.status === 'not-coming' ? '#f56565' : '#e2e8f0'}; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">
-                            ✗ No
-                        </button>
-                        <input type="number" 
-                               class="guest-count" 
-                               value="${guest.guests || 1}" 
-                               min="1" 
-                               max="10"
-                               onchange="updateAdditionalGuestCount(${index}, this.value)"
-                               ${guest.status !== 'coming' ? 'disabled' : ''}
-                               style="width: 50px; margin-left: 8px;">
-                    </div>
-                `;
+                // Different UI for owners vs guests for additional guests too
+                if (isEventOwner()) {
+                    // Owner sees single toggle button + guest count
+                    rsvpRow.innerHTML = `
+                        <div class="family-member" style="display: flex; align-items: center;">
+                            ${guest.name}
+                            <span style="color: #718096; font-size: 12px; margin-left: 5px;">(guest)</span>
+                            <button onclick="removeAdditionalGuest(${index})" style="margin-left: auto; background: none; border: none; color: #e53e3e; cursor: pointer; font-size: 16px;">×</button>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="rsvp-btn ${guest.status === 'coming' ? 'attending' : guest.status === 'not-coming' ? 'not-attending' : 'pending'}" 
+                                    onclick="toggleAdditionalGuestStatus(${index})">
+                                ${guest.status === 'coming' ? 'Attending' : 
+                                  guest.status === 'not-coming' ? 'Can\'t Make It' : 'Pending'}
+                            </button>
+                            <input type="number" 
+                                   class="guest-count" 
+                                   value="${guest.guests || 1}" 
+                                   min="1" 
+                                   max="10"
+                                   onchange="updateAdditionalGuestCount(${index}, this.value)"
+                                   ${guest.status !== 'coming' ? 'disabled' : ''}
+                                   style="width: 60px;">
+                        </div>
+                    `;
+                } else {
+                    // Guest view
+                    const isCurrentGuest = currentGuestName && guest.name.toLowerCase() === currentGuestName.toLowerCase();
+                    if (isCurrentGuest) {
+                        rsvpRow.innerHTML = `
+                            <div class="family-member" style="display: flex; align-items: center;">
+                                ${guest.name}
+                                <span style="color: #718096; font-size: 12px; margin-left: 5px;">(guest)</span>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <button class="rsvp-btn-new ${guest.status === 'coming' ? 'active' : ''}" 
+                                        onclick="setAdditionalGuestStatus(${index}, 'coming')" 
+                                        style="background: ${guest.status === 'coming' ? '#48bb78' : '#f7fafc'}; color: ${guest.status === 'coming' ? 'white' : '#4a5568'}; border: 1px solid ${guest.status === 'coming' ? '#48bb78' : '#e2e8f0'}; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">
+                                    ✓ Yes
+                                </button>
+                                <button class="rsvp-btn-new ${guest.status === 'not-coming' ? 'active' : ''}" 
+                                        onclick="setAdditionalGuestStatus(${index}, 'not-coming')" 
+                                        style="background: ${guest.status === 'not-coming' ? '#f56565' : '#f7fafc'}; color: ${guest.status === 'not-coming' ? 'white' : '#4a5568'}; border: 1px solid ${guest.status === 'not-coming' ? '#f56565' : '#e2e8f0'}; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">
+                                    ✗ No
+                                </button>
+                                <input type="number" 
+                                       class="guest-count" 
+                                       value="${guest.guests || 1}" 
+                                       min="1" 
+                                       max="10"
+                                       onchange="updateAdditionalGuestCount(${index}, this.value)"
+                                       ${guest.status !== 'coming' ? 'disabled' : ''}
+                                       style="width: 50px; margin-left: 8px;">
+                            </div>
+                        `;
+                    } else {
+                        // Other guests show read-only status
+                        rsvpRow.innerHTML = `
+                            <div class="family-member">${guest.name} <span style="color: #718096; font-size: 12px;">(guest)</span></div>
+                            <div style="padding: 6px 12px; background: ${guest.status === 'coming' ? '#e6fffa' : guest.status === 'not-coming' ? '#fed7d7' : '#f7fafc'}; border-radius: 6px; font-size: 12px;">
+                                ${guest.status === 'coming' ? '✓ Attending (' + (guest.guests || 1) + ')' : 
+                                  guest.status === 'not-coming' ? '✗ Can\'t make it' : '⏳ Pending'}
+                            </div>
+                        `;
+                    }
+                }
                 
                 rsvpContainer.appendChild(rsvpRow);
             });
             
-            // Show Add Guests button only if user has edit permissions
-            const canEditGuests = eventPermissions.allowGuestEdits || isEventOwner();
+            // Show Add Guests button for owners, or guests with edit permissions  
+            const canEditGuests = isEventOwner() || (eventPermissions.allowGuestEdits && currentGuestName);
             
             if (guestsToShow.length === 0 && additionalGuestsToShow.length === 0) {
-                if (canViewAllGuests) {
+                if (canViewAllGuests || isEventOwner()) {
                     rsvpContainer.innerHTML = `
                         <div style="padding: 30px 20px; text-align: center;">
                             <p style="color: #718096; margin-bottom: 15px;">No guests added yet</p>
@@ -666,7 +746,7 @@
                     `;
                 }
             } else if (canEditGuests) {
-                // Add "Add Guests" button at the bottom for users with edit permissions
+                // Add "Add Guests" button at the bottom for owners or users with edit permissions
                 const addGuestsBtn = document.createElement('div');
                 addGuestsBtn.style.cssText = 'padding: 15px 20px; text-align: center;';
                 addGuestsBtn.innerHTML = `
@@ -675,6 +755,54 @@
                     </button>
                 `;
                 rsvpContainer.appendChild(addGuestsBtn);
+            }
+        }
+        
+        function toggleRSVP(member) {
+            if (!rsvpData[member]) {
+                rsvpData[member] = { status: 'pending', guests: 1, previousGuests: 1 };
+            }
+            
+            const current = rsvpData[member].status;
+            
+            if (current === 'pending') {
+                rsvpData[member].status = 'coming';
+                // Restore previous guest count when switching to coming
+                rsvpData[member].guests = rsvpData[member].previousGuests || 1;
+            } else if (current === 'coming') {
+                // Store current guest count before switching away from coming
+                rsvpData[member].previousGuests = rsvpData[member].guests;
+                rsvpData[member].status = 'not-coming';
+                rsvpData[member].guests = 0;
+            } else if (current === 'not-coming') {
+                rsvpData[member].status = 'pending';
+                rsvpData[member].guests = 0;
+            }
+            
+            updateDisplay();
+            saveStateToFirebase();
+        }
+        
+        function toggleAdditionalGuestStatus(index) {
+            if (additionalGuests[index]) {
+                const current = additionalGuests[index].status;
+                
+                if (current === 'pending') {
+                    additionalGuests[index].status = 'coming';
+                    // Restore previous guest count when switching to coming
+                    additionalGuests[index].guests = additionalGuests[index].previousGuests || 1;
+                } else if (current === 'coming') {
+                    // Store current guest count before switching away from coming
+                    additionalGuests[index].previousGuests = additionalGuests[index].guests || 1;
+                    additionalGuests[index].status = 'not-coming';
+                    additionalGuests[index].guests = 0;
+                } else if (current === 'not-coming') {
+                    additionalGuests[index].status = 'pending';
+                    additionalGuests[index].guests = 0;
+                }
+                
+                updateDisplay();
+                saveStateToFirebase();
             }
         }
         
@@ -1477,17 +1605,17 @@
         let selectedGuestType = null; // 'existing' or 'new'
         
         function showGuestNamePrompt() {
+            // Don't show prompt for event owners
+            if (isEventOwner()) {
+                return;
+            }
+            
             // Check if guest name is already stored
             const storedName = localStorage.getItem(`guest_name_${currentEventId}`);
             if (storedName) {
                 currentGuestName = storedName;
                 // If they already have a stored name, show them the restricted view directly
                 showGuestRestrictedView();
-                return;
-            }
-            
-            // Don't show prompt for event owners
-            if (isEventOwner()) {
                 return;
             }
             
@@ -1825,14 +1953,17 @@
         }
         
         function hideGuestEditingControls() {
-            // Hide edit buttons in section headers
+            // Only hide controls if user is actually a guest (not owner)
+            if (isEventOwner()) return;
+            
+            // Hide edit buttons in section headers for guests
             document.querySelectorAll('.edit-btn').forEach(btn => {
                 if (!eventPermissions.allowItemEdits && btn.textContent.includes('Edit Items')) {
                     btn.style.display = 'none';
                 }
             });
             
-            // Hide guest remove buttons and edit capabilities
+            // Hide guest remove buttons and edit capabilities for guests
             if (!eventPermissions.allowGuestEdits) {
                 document.querySelectorAll('[onclick*="removeGuest"]').forEach(btn => {
                     btn.style.display = 'none';
