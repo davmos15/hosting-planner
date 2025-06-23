@@ -395,6 +395,15 @@
             if (!currentUser) return;
             
             try {
+                // First, ensure user document exists
+                await db.collection('users').doc(currentUser.uid).set({
+                    email: currentUser.email,
+                    displayName: currentUser.displayName || currentUser.email.split('@')[0],
+                    eventCount: 0,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                
+                // Then load events
                 const eventsSnapshot = await db.collection('events')
                     .where('ownerId', '==', currentUser.uid)
                     .orderBy('createdAt', 'desc')
@@ -409,7 +418,12 @@
                 renderEventsList(events);
             } catch (error) {
                 console.error('Error loading dashboard:', error);
-                document.getElementById('user-events-list').innerHTML = '<p>Error loading events</p>';
+                // If it's an index error, show a helpful message
+                if (error.message.includes('index')) {
+                    document.getElementById('user-events-list').innerHTML = '<p>Setting up your dashboard... Please wait a moment and try again.</p>';
+                } else {
+                    document.getElementById('user-events-list').innerHTML = '<p>No events created yet. <a href="#" onclick="showCreateEventModal(); closeDashboardModal();">Create your first event</a></p>';
+                }
             }
         }
         
@@ -560,9 +574,15 @@
                 return;
             }
             
-            // Show benefits popup for anonymous users
+            // Show benefits popup for anonymous users but allow them to continue
             if (!currentUser) {
-                showBenefitsModal();
+                const continueAsGuest = confirm('Sign up for advanced features like event ownership and permission controls, or continue as guest?');
+                if (!continueAsGuest) {
+                    showBenefitsModal();
+                    return;
+                }
+                // Continue with anonymous event creation
+                await createAnonymousEvent();
                 return;
             }
             
@@ -615,16 +635,20 @@
                 
                 await db.collection('events').doc(eventId).set(eventData);
                 
-                // Update user event count
+                // Update user event count (create user doc if it doesn't exist)
                 try {
-                    await db.collection('users').doc(currentUser.uid).update({
-                        eventCount: firebase.firestore.FieldValue.increment(1)
-                    });
+                    await db.collection('users').doc(currentUser.uid).set({
+                        email: currentUser.email,
+                        displayName: currentUser.displayName || currentUser.email.split('@')[0],
+                        eventCount: firebase.firestore.FieldValue.increment(1),
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
                 } catch (error) {
                     console.error('Error updating user event count:', error);
                 }
                 
-                // Redirect to the event page
+                // Close modal and redirect
+                closeCreateEventModal();
                 window.location.href = `event.html?id=${eventId}`;
                 
             } catch (error) {
