@@ -8,9 +8,13 @@ service cloud.firestore {
       // Allow creation for authenticated users OR anonymous events
       allow create: if true; // Allow both authenticated and anonymous creation
       
-      // Allow updates for owners OR if no owner (anonymous events)
-      allow update: if request.auth != null && request.auth.uid == resource.data.ownerId
-                    || resource.data.ownerId == null; // Anonymous events
+      // Allow updates for:
+      // 1. Authenticated owners
+      // 2. Anonymous events (no ownerId)
+      // 3. Events without ownerId field (legacy events)
+      allow update: if (request.auth != null && request.auth.uid == resource.data.ownerId)
+                    || (!("ownerId" in resource.data))
+                    || (resource.data.ownerId == null);
       
       // Only owners can delete their events
       allow delete: if request.auth != null && request.auth.uid == resource.data.ownerId;

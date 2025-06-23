@@ -377,8 +377,17 @@
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                 };
                 
+                // Preserve ownership and permissions
+                if (eventOwner) {
+                    state.ownerId = eventOwner;
+                }
+                if (eventPermissions) {
+                    state.permissions = eventPermissions;
+                }
+                
                 if (currentEventId) {
-                    await db.collection('events').doc(currentEventId).set(state);
+                    // Use merge to preserve fields we don't update
+                    await db.collection('events').doc(currentEventId).set(state, { merge: true });
                 } else {
                     console.error('No event ID available for saving');
                 }
@@ -2050,9 +2059,7 @@
         }
         
         function isEventOwner() {
-            const isOwner = currentUser && eventOwner && currentUser.uid === eventOwner;
-            console.log('Owner check:', { currentUser: currentUser?.uid, eventOwner, isOwner });
-            return isOwner;
+            return currentUser && eventOwner && currentUser.uid === eventOwner;
         }
         
         function canEditGuests() {
