@@ -11,6 +11,7 @@
     <!-- Firebase Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-auth-compat.min.js"></script>
     
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -20,6 +21,12 @@
     
     <!-- New Event Button -->
     <button class="new-event-btn" onclick="createNewEvent()">✨ New Event +</button>
+    
+    <!-- Owner Controls -->
+    <div class="owner-controls" id="owner-controls" style="display: none;">
+        <div class="owner-badge" id="owner-badge">👑 Owner</div>
+        <button class="settings-btn" onclick="showEventSettings()">⚙️ Settings</button>
+    </div>
 
     <div class="container">
         <div class="header">
@@ -34,24 +41,28 @@
         </div>
         
         <div class="section">
-            <div class="section-header">
-                <h3>👥 Guests</h3>
+            <div class="section-header" onclick="toggleSection('guests-section')">
+                <h3>👥 Guests<span class="collapse-indicator" id="guests-indicator">▼</span></h3>
             </div>
-            <div id="rsvp-list"></div>
+            <div class="section-content" id="guests-section">
+                <div id="rsvp-list"></div>
+            </div>
         </div>
         
         <div class="total-guests" id="guest-summary"></div>
         
         <div class="section">
-            <div class="section-header">
-                <h3>🍽️ What to Bring</h3>
-                <button class="edit-btn" onclick="editItems()">✏️ Edit Items</button>
+            <div class="section-header" onclick="toggleSection('bring-section')">
+                <h3>🍽️ What to Bring<span class="collapse-indicator" id="bring-indicator">▼</span></h3>
+                <button class="edit-btn" onclick="editItems(); event.stopPropagation();">✏️ Edit Items</button>
             </div>
-            <div id="bring-list"></div>
+            <div class="section-content" id="bring-section">
+                <div id="bring-list"></div>
+            </div>
         </div>
         
         <button class="summary-btn" onclick="shareSummary()">
-            📱 Share Update
+            📱 Share Event
         </button>
     </div>
 
@@ -162,13 +173,68 @@
             
             <div class="form-section">
                 <label for="event-password-input">Password Protection (optional)</label>
-                <input type="password" id="event-password-input" placeholder="Leave blank for no password">
+                <div style="position: relative;">
+                    <input type="password" id="event-password-input" placeholder="Leave blank for no password">
+                    <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('event-password-input')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #718096; font-size: 16px;">👁️</button>
+                </div>
                 <small>If set, guests will need this password to access the event</small>
             </div>
             
             <div class="modal-buttons">
                 <button class="modal-btn secondary" onclick="closeCreateEventModal()">Cancel</button>
                 <button class="modal-btn primary" onclick="createEventFromModal()">Create Event</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Settings Modal -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-content large-modal">
+            <h3>Event Settings</h3>
+            
+            <div class="settings-section">
+                <h4>Guest Permissions</h4>
+                <label class="settings-toggle">
+                    <input type="checkbox" id="allow-guest-edits" checked>
+                    <span>Allow guests to add/edit other guests</span>
+                </label>
+            </div>
+            
+            <div class="settings-section">
+                <h4>Item Permissions</h4>
+                <label class="settings-toggle">
+                    <input type="checkbox" id="allow-item-edits" checked>
+                    <span>Allow guests to add/edit items</span>
+                </label>
+            </div>
+            
+            <div class="settings-section">
+                <h4>Visibility Settings</h4>
+                <label class="settings-toggle">
+                    <input type="checkbox" id="hide-guest-list">
+                    <span>Hide guest list from attendees</span>
+                </label>
+                <label class="settings-toggle">
+                    <input type="checkbox" id="hide-items-list">
+                    <span>Hide items list from attendees</span>
+                </label>
+            </div>
+            
+            <div class="settings-section">
+                <h4>Password Management</h4>
+                <div class="form-section">
+                    <label for="settings-password">Event Password</label>
+                    <div style="position: relative;">
+                        <input type="password" id="settings-password" placeholder="Leave blank for no password">
+                        <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('settings-password')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #718096; font-size: 16px;">👁️</button>
+                    </div>
+                    <small>Change or remove the event password</small>
+                </div>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="modal-btn primary" onclick="saveEventSettings()">Save Settings</button>
+                <button class="modal-btn secondary" onclick="closeEventSettings()">Cancel</button>
             </div>
         </div>
     </div>
@@ -188,6 +254,17 @@
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        const auth = firebase.auth();
+        
+        // Global auth and permission state
+        let currentUser = null;
+        let eventOwner = null;
+        let eventPermissions = {
+            allowGuestEdits: true,
+            allowItemEdits: true,
+            hideGuestList: false,
+            hideItemsList: false
+        };
         
         // Guest list - starts empty, users will add guests
         let guestList = [];
@@ -273,7 +350,18 @@
                 if (doc.exists) {
                     const data = doc.data();
                     
-                    // Load data from Firebase
+                    // Load ownership and permission data
+                    eventOwner = data.ownerId || null;
+                    if (data.permissions) {
+                        eventPermissions = {
+                            allowGuestEdits: data.permissions.allowGuestEdits !== false, // default true for backward compatibility
+                            allowItemEdits: data.permissions.allowItemEdits !== false,
+                            hideGuestList: data.permissions.hideGuestList || false,
+                            hideItemsList: data.permissions.hideItemsList || false
+                        };
+                    }
+                    
+                    // Load existing data from Firebase
                     if (data.rsvpData) rsvpData = data.rsvpData;
                     if (data.bringData) bringData = data.bringData;
                     if (data.currentHost) currentHost = data.currentHost;
@@ -299,6 +387,8 @@
                     
                     initializeBringData();
                     updateDisplay();
+                    updateOwnershipUI();
+                    updatePermissionBasedUI();
                     updateSyncStatus('online');
                     console.log('✅ State loaded from Firebase');
                 } else {
@@ -407,6 +497,9 @@
             updateRSVPList();
             updateGuestSummary();
             updateBringList();
+            
+            // Initialize section heights for collapsible functionality
+            setTimeout(initializeSectionHeights, 100);
         }
         
         function updateRSVPList() {
@@ -667,6 +760,10 @@
         }
         
         function editItems() {
+            if (!canEditItems()) {
+                alert('You do not have permission to edit items for this event.');
+                return;
+            }
             updateEditList();
             document.getElementById('edit-modal').style.display = 'flex';
         }
@@ -746,6 +843,10 @@
         }
         
         function showAddGuestsModal() {
+            if (!canEditGuests()) {
+                alert('You do not have permission to add guests to this event.');
+                return;
+            }
             document.getElementById('guest-name-input').value = '';
             document.getElementById('guest-name-input').focus();
             document.getElementById('guests-modal').style.display = 'flex';
@@ -977,47 +1078,35 @@
         }
         
         async function shareSummary() {
-            const host = getCurrentHost();
-            const date = getEventDate();
-            const coming = guestList.filter(g => rsvpData[g] && rsvpData[g].status === 'coming');
-            const mainGuests = coming.reduce((sum, guest) => sum + (rsvpData[guest].guests || 0), 0);
-            const additionalGuestsTotal = additionalGuests
-                .filter(g => g.status === 'coming')
-                .reduce((sum, guest) => sum + (guest.guests || 1), 0);
-            const totalGuests = mainGuests + additionalGuestsTotal;
+            const host = getCurrentHost() || 'TBD';
             
-            const coveredItems = bringItems
-                .filter(item => bringData[item].assigned)
-                .map(item => `${item}: ${bringData[item].person}`)
-                .join('\n');
-            
-            const neededItems = bringItems
-                .filter(item => !bringData[item].assigned)
-                .join(', ');
-            
-            const baseURL = `${window.location.origin}${window.location.pathname}?id=${currentEventId}`;
-            
-            let message = `📅 *Event Planning*\n\n`;
-            message += `📅 *Date:* ${date}\n`;
-            message += `🏠 *Host(s):* ${host || 'TBD'}\n`;
-            const totalAttending = coming.length + additionalGuests.filter(g => g.status === 'coming').length;
-            message += `👥 *${totalGuests} guests* (${totalAttending} confirmed)\n\n`;
-            
-            if (coveredItems) {
-                message += `✅ *Bringing:*\n${coveredItems}\n\n`;
+            // Format date properly
+            let formattedDate = 'TBD';
+            if (currentDate) {
+                const dateObj = new Date(currentDate);
+                formattedDate = dateObj.toLocaleDateString('en-GB', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
             }
             
-            if (neededItems) {
-                message += `❓ *Still needed:* ${neededItems}\n\n`;
-            }
+            // Get the proper base URL with custom event URL
+            const baseURL = `https://hosting-planner.vercel.app/event.html?id=${currentEventId}`;
             
-            message += `🔗 RSVP & update: ${baseURL}`;
+            let message = `📅 *${currentEventName || 'Event'}*\n`;
+            message += `📅 *Date:* 📅 ${formattedDate}\n`;
+            message += `🏠 *Host(s):* ${host}\n`;
+            if (currentAddress) {
+                message += `📌 *${currentAddress}*\n`;
+            }
+            message += `\n🔗 RSVP & confirm what you can bring: ${baseURL}`;
             
             // Copy to clipboard
             navigator.clipboard.writeText(message).then(() => {
-                alert('📱 Summary copied to clipboard!\nShare via your preferred messaging app.');
+                alert('📱 Event details copied to clipboard!\nShare via your preferred messaging app.');
             }).catch(() => {
-                alert('Summary ready:\n\n' + message);
+                alert('Event details ready:\n\n' + message);
             });
         }
         
@@ -1264,8 +1353,201 @@
             if (e.target === this) closeGuestsModal();
         }
         
+        function togglePasswordVisibility(inputId) {
+            const input = document.getElementById(inputId);
+            const button = input.nextElementSibling;
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                button.textContent = '👁️';
+            }
+        }
+        
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const indicator = document.getElementById(sectionId.replace('-section', '-indicator'));
+            
+            if (section.classList.contains('collapsed')) {
+                section.classList.remove('collapsed');
+                section.style.maxHeight = section.scrollHeight + 'px';
+                indicator.classList.remove('collapsed');
+            } else {
+                section.style.maxHeight = section.scrollHeight + 'px';
+                setTimeout(() => {
+                    section.classList.add('collapsed');
+                    indicator.classList.add('collapsed');
+                }, 10);
+            }
+        }
+        
+        function initializeSectionHeights() {
+            const sections = document.querySelectorAll('.section-content');
+            sections.forEach(section => {
+                if (!section.classList.contains('collapsed')) {
+                    section.style.maxHeight = section.scrollHeight + 'px';
+                }
+            });
+        }
+        
+        // Authentication and permission functions
+        function updateOwnershipUI() {
+            const ownerControls = document.getElementById('owner-controls');
+            const isOwner = currentUser && eventOwner && currentUser.uid === eventOwner;
+            
+            if (isOwner) {
+                ownerControls.style.display = 'flex';
+            } else {
+                ownerControls.style.display = 'none';
+            }
+        }
+        
+        function updatePermissionBasedUI() {
+            const guestSection = document.querySelector('.section:has(#rsvp-list)');
+            const bringSection = document.querySelector('.section:has(#bring-list)');
+            
+            // Handle guest list visibility
+            if (eventPermissions.hideGuestList && !isEventOwner()) {
+                if (guestSection) {
+                    guestSection.style.display = 'none';
+                }
+            } else {
+                if (guestSection) {
+                    guestSection.style.display = 'block';
+                }
+            }
+            
+            // Handle items list visibility
+            if (eventPermissions.hideItemsList && !isEventOwner()) {
+                if (bringSection) {
+                    bringSection.style.display = 'none';
+                }
+            } else {
+                if (bringSection) {
+                    bringSection.style.display = 'block';
+                }
+            }
+            
+            // Add permission notices
+            addPermissionNotices();
+        }
+        
+        function addPermissionNotices() {
+            // Remove existing notices
+            document.querySelectorAll('.permission-notice').forEach(notice => notice.remove());
+            
+            const isOwner = isEventOwner();
+            
+            // Guest editing notice
+            if (!eventPermissions.allowGuestEdits && !isOwner) {
+                const guestSection = document.getElementById('guests-section');
+                if (guestSection) {
+                    const notice = document.createElement('div');
+                    notice.className = 'permission-notice';
+                    notice.innerHTML = '<strong>Note:</strong> Only the event owner can add or edit guests.';
+                    guestSection.insertBefore(notice, guestSection.firstChild);
+                }
+            }
+            
+            // Item editing notice
+            if (!eventPermissions.allowItemEdits && !isOwner) {
+                const bringSection = document.getElementById('bring-section');
+                if (bringSection) {
+                    const notice = document.createElement('div');
+                    notice.className = 'permission-notice';
+                    notice.innerHTML = '<strong>Note:</strong> Only the event owner can add or edit items.';
+                    bringSection.insertBefore(notice, bringSection.firstChild);
+                }
+            }
+        }
+        
+        function isEventOwner() {
+            return currentUser && eventOwner && currentUser.uid === eventOwner;
+        }
+        
+        function canEditGuests() {
+            return isEventOwner() || eventPermissions.allowGuestEdits;
+        }
+        
+        function canEditItems() {
+            return isEventOwner() || eventPermissions.allowItemEdits;
+        }
+        
+        function showEventSettings() {
+            if (!isEventOwner()) {
+                alert('Only the event owner can change settings.');
+                return;
+            }
+            
+            // Load current settings into form
+            document.getElementById('allow-guest-edits').checked = eventPermissions.allowGuestEdits;
+            document.getElementById('allow-item-edits').checked = eventPermissions.allowItemEdits;
+            document.getElementById('hide-guest-list').checked = eventPermissions.hideGuestList;
+            document.getElementById('hide-items-list').checked = eventPermissions.hideItemsList;
+            document.getElementById('settings-password').value = currentEventPassword || '';
+            
+            document.getElementById('settings-modal').style.display = 'flex';
+        }
+        
+        function closeEventSettings() {
+            document.getElementById('settings-modal').style.display = 'none';
+        }
+        
+        async function saveEventSettings() {
+            if (!isEventOwner()) {
+                alert('Only the event owner can change settings.');
+                return;
+            }
+            
+            const newPermissions = {
+                allowGuestEdits: document.getElementById('allow-guest-edits').checked,
+                allowItemEdits: document.getElementById('allow-item-edits').checked,
+                hideGuestList: document.getElementById('hide-guest-list').checked,
+                hideItemsList: document.getElementById('hide-items-list').checked
+            };
+            
+            const newPassword = document.getElementById('settings-password').value;
+            
+            try {
+                updateSyncStatus('saving');
+                
+                await db.collection('events').doc(currentEventId).update({
+                    permissions: newPermissions,
+                    password: newPassword || null,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Update local state
+                eventPermissions = newPermissions;
+                currentEventPassword = newPassword || null;
+                
+                updatePermissionBasedUI();
+                closeEventSettings();
+                updateSyncStatus('online');
+                
+                alert('Settings saved successfully!');
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                alert('Failed to save settings. Please try again.');
+                updateSyncStatus('offline');
+            }
+        }
+        
+        // Auth state listener
+        auth.onAuthStateChanged((user) => {
+            currentUser = user;
+            updateOwnershipUI();
+            updatePermissionBasedUI();
+        });
+        
         document.getElementById('create-event-modal').onclick = function(e) {
             if (e.target === this) closeCreateEventModal();
+        }
+        
+        document.getElementById('settings-modal').onclick = function(e) {
+            if (e.target === this) closeEventSettings();
         }
     </script>
 </body>

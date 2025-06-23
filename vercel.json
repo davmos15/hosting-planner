@@ -20,6 +20,15 @@
           "value": "1; mode=block"
         }
       ]
+    },
+    {
+      "source": "/Favicon.png",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
     }
   ]
 }

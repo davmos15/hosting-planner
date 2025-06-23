@@ -1,6 +1,6 @@
 # Hosting Planner
 
-A real-time event planning web application that makes coordinating gatherings simple and efficient. Create events, manage RSVPs, coordinate what guests bring, and share updates - all without requiring sign-ups or downloads.
+A real-time event planning web application that makes coordinating gatherings simple and efficient. Create events, manage RSVPs, coordinate what guests bring, and share updates. Works great for both casual anonymous use and registered users who want advanced features like event ownership and permission controls.
 
 ## 🌟 Features
 
@@ -9,6 +9,7 @@ A real-time event planning web application that makes coordinating gatherings si
 - **Unique Event URLs**: Each event gets its own shareable link (e.g., `birthday-party-abc123`)
 - **Password Protection**: Optional passwords for private events
 - **Multi-Event Support**: Create and manage multiple events simultaneously
+- **Optional Authentication**: Sign up for advanced features or continue as guest
 
 ### Guest Coordination
 - **Easy RSVP System**: Three simple states - Attending, Pending, Can't Make It
@@ -26,6 +27,13 @@ A real-time event planning web application that makes coordinating gatherings si
 - **One-Click Sharing**: Generate formatted summaries for messaging apps
 - **Live Status**: See who's online and when changes are saved
 - **No App Required**: Works in any web browser on any device
+
+### Authentication & Ownership (Optional)
+- **Event Ownership**: Registered users get full control over their events
+- **Permission Controls**: Set who can add guests, edit items, or view sections
+- **Multi-Event Dashboard**: Manage all your events from one place
+- **Event History**: Track your event creation and statistics
+- **Guest Mode**: Continue using anonymously with full functionality
 
 ## 🚀 Getting Started
 
@@ -59,8 +67,9 @@ npx http-server -p 8000
 #### Firebase Setup
 1. Create a new Firebase project at [console.firebase.google.com](https://console.firebase.google.com)
 2. Enable Firestore Database
-3. Update the Firebase configuration in `index.html` and `event.html`
-4. Set Firestore rules (see Security section)
+3. Enable Authentication with Email/Password provider (optional, for user accounts)
+4. Update the Firebase configuration in `index.html` and `event.html`
+5. Set Firestore rules (see Security section and `AUTHENTICATION.md`)
 
 #### Deployment
 
@@ -91,10 +100,15 @@ vercel
 ## 🛡️ Security
 
 ### Current Setup
-- Open access for event creation and participation
+- Open access for event creation and participation (anonymous users)
+- Optional user authentication with Firebase Auth
+- Event ownership and permission controls for registered users
 - Optional password protection per event
 - Client-side password validation
 - Session-based password storage
+
+### Authentication System
+For detailed information about the optional authentication system, see [`AUTHENTICATION.md`](./AUTHENTICATION.md).
 
 ### Firestore Rules
 ```javascript
