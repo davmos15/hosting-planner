@@ -1569,16 +1569,17 @@
             // Initialize and display
             initializeBringData();
             
-            // For guests, hide content initially and show search modal
-            // For owners, show full content immediately
-            if (isEventOwner() || localStorage.getItem(`guest_name_${currentEventId}`)) {
+            // For owners, always show full content immediately
+            // For guests, handle based on whether they've visited before
+            if (isEventOwner()) {
+                // Owner always gets full interface
                 updateDisplay();
-                if (!isEventOwner()) {
-                    // Guest returning - show restricted view
-                    setTimeout(() => {
-                        showGuestNamePrompt();
-                    }, 100);
-                }
+            } else if (localStorage.getItem(`guest_name_${currentEventId}`)) {
+                // Returning guest - show restricted view
+                updateDisplay();
+                setTimeout(() => {
+                    showGuestNamePrompt();
+                }, 100);
             } else {
                 // New guest - hide content and show search modal
                 hidePageContentForGuests();
@@ -1761,6 +1762,11 @@
         }
         
         function showGuestRestrictedView() {
+            // Don't apply guest restrictions to owners
+            if (isEventOwner()) {
+                return;
+            }
+            
             // Show the page content now that guest has RSVP'd
             showPageContentForGuests();
             
