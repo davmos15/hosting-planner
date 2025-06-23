@@ -624,10 +624,10 @@
                     ownerId: currentUser.uid,
                     ownerEmail: currentUser.email,
                     permissions: {
+                        allowGuestView: true,
                         allowGuestEdits: true,
-                        allowItemEdits: true,
-                        hideGuestList: false,
-                        hideItemsList: false
+                        allowItemView: true,
+                        allowItemEdits: true
                     },
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
@@ -710,10 +710,10 @@
                     ownerId: null,
                     ownerEmail: null,
                     permissions: {
+                        allowGuestView: true,
                         allowGuestEdits: true,
-                        allowItemEdits: true,
-                        hideGuestList: false,
-                        hideItemsList: false
+                        allowItemView: true,
+                        allowItemEdits: true
                     },
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp()

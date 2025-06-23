@@ -19,8 +19,22 @@
     <!-- Sync Status Indicator -->
     <div id="sync-status" class="sync-status sync-offline">⚫ Connecting...</div>
     
-    <!-- New Event Button -->
-    <button class="new-event-btn" onclick="createNewEvent()">✨ New Event +</button>
+    <!-- User Profile Section (shown when logged in) -->
+    <div class="user-profile-section" id="user-profile-section" style="display: none;">
+        <div class="user-avatar" onclick="toggleEventUserMenu()" id="event-user-avatar">
+            <span id="event-user-initial">U</span>
+        </div>
+        <div class="dropdown-menu" id="event-dropdown-menu" style="display: none;">
+            <div class="user-info">
+                <span id="event-user-email">user@example.com</span>
+            </div>
+            <button onclick="showUserDashboard()">📊 My Events</button>
+            <button onclick="signOut()">🚪 Sign Out</button>
+        </div>
+    </div>
+    
+    <!-- New Event Button (shown when not logged in) -->
+    <button class="new-event-btn" id="new-event-btn" onclick="createNewEvent()">✨ New Event +</button>
     
     <!-- Owner Controls -->
     <div class="owner-controls" id="owner-controls" style="display: none;">
@@ -193,32 +207,29 @@
             <h3>Event Settings</h3>
             
             <div class="settings-section">
-                <h4>Guest Permissions</h4>
+                <h4>Guest List Permissions</h4>
+                <label class="settings-toggle">
+                    <input type="checkbox" id="allow-guest-view" checked>
+                    <span>Allow guests to view guest list</span>
+                </label>
                 <label class="settings-toggle">
                     <input type="checkbox" id="allow-guest-edits" checked>
-                    <span>Allow guests to add/edit other guests</span>
+                    <span>Allow guests to edit their own name</span>
                 </label>
             </div>
             
             <div class="settings-section">
-                <h4>Item Permissions</h4>
+                <h4>Items List Permissions</h4>
+                <label class="settings-toggle">
+                    <input type="checkbox" id="allow-item-view" checked>
+                    <span>Allow guests to view items list</span>
+                </label>
                 <label class="settings-toggle">
                     <input type="checkbox" id="allow-item-edits" checked>
                     <span>Allow guests to add/edit items</span>
                 </label>
             </div>
             
-            <div class="settings-section">
-                <h4>Visibility Settings</h4>
-                <label class="settings-toggle">
-                    <input type="checkbox" id="hide-guest-list">
-                    <span>Hide guest list from attendees</span>
-                </label>
-                <label class="settings-toggle">
-                    <input type="checkbox" id="hide-items-list">
-                    <span>Hide items list from attendees</span>
-                </label>
-            </div>
             
             <div class="settings-section">
                 <h4>Password Management</h4>
@@ -235,6 +246,30 @@
             <div class="modal-buttons">
                 <button class="modal-btn primary" onclick="saveEventSettings()">Save Settings</button>
                 <button class="modal-btn secondary" onclick="closeEventSettings()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Dashboard Modal -->
+    <div class="modal" id="dashboard-modal">
+        <div class="modal-content large-modal">
+            <h3>My Events Dashboard</h3>
+            <div class="dashboard-stats" id="dashboard-stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="total-events">0</div>
+                    <div class="stat-label">Total Events</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="active-events">0</div>
+                    <div class="stat-label">Active Events</div>
+                </div>
+            </div>
+            <div class="events-list" id="user-events-list">
+                <p>Loading your events...</p>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn primary" onclick="window.location.href='index.html';">Create New Event</button>
+                <button class="modal-btn secondary" onclick="closeDashboardModal()">Close</button>
             </div>
         </div>
     </div>
@@ -260,10 +295,10 @@
         let currentUser = null;
         let eventOwner = null;
         let eventPermissions = {
+            allowGuestView: true,
             allowGuestEdits: true,
-            allowItemEdits: true,
-            hideGuestList: false,
-            hideItemsList: false
+            allowItemView: true,
+            allowItemEdits: true
         };
         
         // Guest list - starts empty, users will add guests
@@ -354,10 +389,18 @@
                     eventOwner = data.ownerId || null;
                     if (data.permissions) {
                         eventPermissions = {
-                            allowGuestEdits: data.permissions.allowGuestEdits !== false, // default true for backward compatibility
+                            // New permission structure
+                            allowGuestView: data.permissions.allowGuestView !== false, // default true for backward compatibility
+                            allowGuestEdits: data.permissions.allowGuestEdits !== false,
+                            allowItemView: data.permissions.allowItemView !== false,
                             allowItemEdits: data.permissions.allowItemEdits !== false,
-                            hideGuestList: data.permissions.hideGuestList || false,
-                            hideItemsList: data.permissions.hideItemsList || false
+                            // Handle old permission structure for backward compatibility
+                            ...(data.permissions.hideGuestList !== undefined && {
+                                allowGuestView: !data.permissions.hideGuestList
+                            }),
+                            ...(data.permissions.hideItemsList !== undefined && {
+                                allowItemView: !data.permissions.hideItemsList
+                            })
                         };
                     }
                     
@@ -1409,7 +1452,7 @@
             const bringSection = document.querySelector('.section:has(#bring-list)');
             
             // Handle guest list visibility
-            if (eventPermissions.hideGuestList && !isEventOwner()) {
+            if (!eventPermissions.allowGuestView && !isEventOwner()) {
                 if (guestSection) {
                     guestSection.style.display = 'none';
                 }
@@ -1419,8 +1462,8 @@
                 }
             }
             
-            // Handle items list visibility
-            if (eventPermissions.hideItemsList && !isEventOwner()) {
+            // Handle items list visibility  
+            if (!eventPermissions.allowItemView && !isEventOwner()) {
                 if (bringSection) {
                     bringSection.style.display = 'none';
                 }
@@ -1432,6 +1475,9 @@
             
             // Add permission notices
             addPermissionNotices();
+            
+            // Update edit capabilities
+            updateEditCapabilities();
         }
         
         function addPermissionNotices() {
@@ -1441,25 +1487,58 @@
             const isOwner = isEventOwner();
             
             // Guest editing notice
-            if (!eventPermissions.allowGuestEdits && !isOwner) {
+            if (!eventPermissions.allowGuestEdits && !isOwner && eventPermissions.allowGuestView) {
                 const guestSection = document.getElementById('guests-section');
                 if (guestSection) {
                     const notice = document.createElement('div');
                     notice.className = 'permission-notice';
-                    notice.innerHTML = '<strong>Note:</strong> Only the event owner can add or edit guests.';
+                    notice.innerHTML = '<strong>Note:</strong> You can RSVP and change your guest count, but cannot edit names.';
                     guestSection.insertBefore(notice, guestSection.firstChild);
                 }
             }
             
             // Item editing notice
-            if (!eventPermissions.allowItemEdits && !isOwner) {
+            if (!eventPermissions.allowItemEdits && !isOwner && eventPermissions.allowItemView) {
                 const bringSection = document.getElementById('bring-section');
                 if (bringSection) {
                     const notice = document.createElement('div');
                     notice.className = 'permission-notice';
-                    notice.innerHTML = '<strong>Note:</strong> Only the event owner can add or edit items.';
+                    notice.innerHTML = '<strong>Note:</strong> You can claim items but cannot add or edit the list.';
                     bringSection.insertBefore(notice, bringSection.firstChild);
                 }
+            }
+        }
+        
+        function updateEditCapabilities() {
+            const isOwner = isEventOwner();
+            
+            // Update guest name edit buttons
+            document.querySelectorAll('.family-member span').forEach(span => {
+                if (!isOwner && !eventPermissions.allowGuestEdits) {
+                    span.style.cursor = 'default';
+                    span.style.textDecoration = 'none';
+                    span.onclick = null;
+                } else {
+                    span.style.cursor = 'pointer';
+                    span.style.textDecoration = 'underline';
+                    span.style.textDecorationStyle = 'dotted';
+                }
+            });
+            
+            // Update item edit buttons
+            const editItemsBtn = document.querySelector('.section-header .edit-btn');
+            if (editItemsBtn) {
+                if (!isOwner && !eventPermissions.allowItemEdits) {
+                    editItemsBtn.style.display = 'none';
+                } else {
+                    editItemsBtn.style.display = 'inline-block';
+                }
+            }
+            
+            // Update add guests button
+            const addGuestsBtn = document.querySelector('button[onclick*="showAddGuestsModal"]');
+            if (addGuestsBtn && !isOwner && !eventPermissions.allowGuestEdits) {
+                addGuestsBtn.style.display = 'none';
             }
         }
         
@@ -1475,6 +1554,14 @@
             return isEventOwner() || eventPermissions.allowItemEdits;
         }
         
+        function canViewGuests() {
+            return isEventOwner() || eventPermissions.allowGuestView;
+        }
+        
+        function canViewItems() {
+            return isEventOwner() || eventPermissions.allowItemView;
+        }
+        
         function showEventSettings() {
             if (!isEventOwner()) {
                 alert('Only the event owner can change settings.');
@@ -1482,10 +1569,10 @@
             }
             
             // Load current settings into form
+            document.getElementById('allow-guest-view').checked = eventPermissions.allowGuestView;
             document.getElementById('allow-guest-edits').checked = eventPermissions.allowGuestEdits;
+            document.getElementById('allow-item-view').checked = eventPermissions.allowItemView;
             document.getElementById('allow-item-edits').checked = eventPermissions.allowItemEdits;
-            document.getElementById('hide-guest-list').checked = eventPermissions.hideGuestList;
-            document.getElementById('hide-items-list').checked = eventPermissions.hideItemsList;
             document.getElementById('settings-password').value = currentEventPassword || '';
             
             document.getElementById('settings-modal').style.display = 'flex';
@@ -1502,10 +1589,10 @@
             }
             
             const newPermissions = {
+                allowGuestView: document.getElementById('allow-guest-view').checked,
                 allowGuestEdits: document.getElementById('allow-guest-edits').checked,
-                allowItemEdits: document.getElementById('allow-item-edits').checked,
-                hideGuestList: document.getElementById('hide-guest-list').checked,
-                hideItemsList: document.getElementById('hide-items-list').checked
+                allowItemView: document.getElementById('allow-item-view').checked,
+                allowItemEdits: document.getElementById('allow-item-edits').checked
             };
             
             const newPassword = document.getElementById('settings-password').value;
@@ -1535,9 +1622,147 @@
             }
         }
         
+        // Event page user profile functions
+        function updateEventPageAuthUI(user) {
+            const userProfileSection = document.getElementById('user-profile-section');
+            const newEventBtn = document.getElementById('new-event-btn');
+            
+            if (user) {
+                currentUser = user;
+                userProfileSection.style.display = 'block';
+                newEventBtn.style.display = 'none';
+                
+                // Update user info
+                document.getElementById('event-user-email').textContent = user.email;
+                document.getElementById('event-user-initial').textContent = user.email.charAt(0).toUpperCase();
+            } else {
+                currentUser = null;
+                userProfileSection.style.display = 'none';
+                newEventBtn.style.display = 'block';
+            }
+        }
+        
+        function toggleEventUserMenu() {
+            const menu = document.getElementById('event-dropdown-menu');
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+        
+        async function showUserDashboard() {
+            document.getElementById('event-dropdown-menu').style.display = 'none';
+            loadUserDashboard();
+            document.getElementById('dashboard-modal').style.display = 'flex';
+        }
+        
+        async function signOut() {
+            try {
+                await auth.signOut();
+                document.getElementById('event-dropdown-menu').style.display = 'none';
+            } catch (error) {
+                console.error('Sign out error:', error);
+            }
+        }
+        
+        async function loadUserDashboard() {
+            if (!currentUser) return;
+            
+            try {
+                // First, ensure user document exists
+                await db.collection('users').doc(currentUser.uid).set({
+                    email: currentUser.email,
+                    displayName: currentUser.displayName || currentUser.email.split('@')[0],
+                    eventCount: 0,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                
+                // Then load events
+                const eventsSnapshot = await db.collection('events')
+                    .where('ownerId', '==', currentUser.uid)
+                    .orderBy('createdAt', 'desc')
+                    .get();
+                
+                const events = eventsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                updateDashboardStats(events);
+                renderEventsList(events);
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                // If it's an index error, show a helpful message
+                if (error.message.includes('index')) {
+                    document.getElementById('user-events-list').innerHTML = '<p>Setting up your dashboard... Please wait a moment and try again.</p>';
+                } else {
+                    document.getElementById('user-events-list').innerHTML = '<p>No events created yet. <a href="#" onclick="window.location.href=\'index.html\';">Create your first event</a></p>';
+                }
+            }
+        }
+        
+        function updateDashboardStats(events) {
+            const totalEvents = events.length;
+            const activeEvents = events.filter(event => {
+                if (!event.currentDate) return false;
+                const eventDate = new Date(event.currentDate);
+                const today = new Date();
+                return eventDate >= today;
+            }).length;
+            
+            document.getElementById('total-events').textContent = totalEvents;
+            document.getElementById('active-events').textContent = activeEvents;
+        }
+        
+        function renderEventsList(events) {
+            const container = document.getElementById('user-events-list');
+            
+            if (events.length === 0) {
+                container.innerHTML = '<p>No events created yet. <a href="#" onclick="window.location.href=\'index.html\';">Create your first event</a></p>';
+                return;
+            }
+            
+            const eventsHTML = events.map(event => {
+                const eventDate = event.currentDate ? new Date(event.currentDate).toLocaleDateString() : 'No date set';
+                const guestCount = event.guestList ? event.guestList.length : 0;
+                const itemCount = event.bringItems ? event.bringItems.length : 0;
+                
+                return `
+                    <div class="event-card">
+                        <div class="event-card-header">
+                            <div class="event-title">${event.eventName || event.currentEventName || 'Untitled Event'}</div>
+                            <div class="event-date">${eventDate}</div>
+                        </div>
+                        <div class="event-stats">
+                            <span>👥 ${guestCount} guests</span>
+                            <span>🍽️ ${itemCount} items</span>
+                        </div>
+                        <div class="event-actions">
+                            <button class="event-btn" onclick="openEvent('${event.id}')">Open Event</button>
+                            <button class="event-btn" onclick="copyEventLink('${event.id}')">Copy Link</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = eventsHTML;
+        }
+        
+        function openEvent(eventId) {
+            window.location.href = `event.html?id=${eventId}`;
+        }
+        
+        function copyEventLink(eventId) {
+            const link = `${window.location.origin}/event.html?id=${eventId}`;
+            navigator.clipboard.writeText(link).then(() => {
+                alert('Event link copied to clipboard!');
+            });
+        }
+        
+        function closeDashboardModal() {
+            document.getElementById('dashboard-modal').style.display = 'none';
+        }
+        
         // Auth state listener
         auth.onAuthStateChanged((user) => {
-            currentUser = user;
+            updateEventPageAuthUI(user);
             updateOwnershipUI();
             updatePermissionBasedUI();
         });
@@ -1549,6 +1774,19 @@
         document.getElementById('settings-modal').onclick = function(e) {
             if (e.target === this) closeEventSettings();
         }
+        
+        document.getElementById('dashboard-modal').onclick = function(e) {
+            if (e.target === this) closeDashboardModal();
+        }
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('event-dropdown-menu');
+            const avatar = document.getElementById('event-user-avatar');
+            if (dropdown && avatar && !avatar.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
     </script>
 </body>
 </html>
