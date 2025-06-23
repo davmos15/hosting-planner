@@ -97,31 +97,6 @@ body {
     color: rgba(255, 255, 255, 0.7);
 }
 
-.sync-status {
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    padding: 5px 10px;
-    border-radius: 15px;
-    font-size: 12px;
-    z-index: 1000;
-    transition: all 0.3s ease;
-}
-
-.sync-online {
-    background: #48bb78;
-    color: white;
-}
-
-.sync-offline {
-    background: #f56565;
-    color: white;
-}
-
-.sync-saving {
-    background: #ed8936;
-    color: white;
-}
 
 .host-info {
     background: #f7fafc;
@@ -224,8 +199,8 @@ body {
 
 .rsvp-grid {
     display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 10px;
+    grid-template-columns: 1fr auto;
+    gap: 15px;
     padding: 15px 20px;
     align-items: center;
 }
