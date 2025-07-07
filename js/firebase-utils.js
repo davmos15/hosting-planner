@@ -32,7 +32,28 @@ async function saveStateToFirebase() {
             state.permissions = eventPermissions;
         }
         
+        // Debug logging
+        console.log('🔍 Save attempt debug info:', {
+            currentEventId,
+            eventOwner,
+            currentUser: currentUser ? currentUser.uid : 'anonymous',
+            hasOwnerId: 'ownerId' in state,
+            ownerId: state.ownerId,
+            isAuthenticated: !!currentUser
+        });
+        
         if (currentEventId) {
+            // Try to get current document first to understand the state
+            const currentDoc = await db.collection('events').doc(currentEventId).get();
+            if (currentDoc.exists) {
+                const currentData = currentDoc.data();
+                console.log('📋 Current document state:', {
+                    hasOwnerId: 'ownerId' in currentData,
+                    currentOwnerId: currentData.ownerId,
+                    requestingOwnerId: state.ownerId
+                });
+            }
+            
             await db.collection('events').doc(currentEventId).set(state, { merge: true });
             console.log('✅ State saved to Firebase');
         } else {
@@ -40,6 +61,13 @@ async function saveStateToFirebase() {
         }
     } catch (error) {
         console.error('❌ Failed to save to Firebase:', error);
+        console.error('❌ Error details:', {
+            code: error.code,
+            message: error.message,
+            currentUser: currentUser ? currentUser.uid : 'anonymous',
+            eventOwner,
+            currentEventId
+        });
         
         // Handle specific error types gracefully
         if (error.code === 'permission-denied') {

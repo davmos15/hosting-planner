@@ -16,16 +16,21 @@ service cloud.firestore {
          && resource.data.ownerId != null 
          && request.auth.uid == resource.data.ownerId)
         
-        // Case 2: Anonymous events (ownerId is null)
-        || (resource.data.ownerId == null)
+        // Case 2: Anonymous events (ownerId is null) - stay anonymous
+        || (resource.data.ownerId == null && request.data.ownerId == null)
         
         // Case 3: Legacy events without ownerId field (backward compatibility)
-        || (resource.data.ownerId is string == false)
+        || (!('ownerId' in resource.data))
         
         // Case 4: Converting anonymous event to owned (user signs up)
         || (request.auth != null 
             && resource.data.ownerId == null 
-            && request.data.ownerId == request.auth.uid);
+            && request.data.ownerId == request.auth.uid)
+            
+        // Case 5: Anonymous user updating anonymous event (no auth, no ownership change)
+        || (request.auth == null 
+            && resource.data.ownerId == null 
+            && (!('ownerId' in request.data) || request.data.ownerId == null));
       
       // Only authenticated owners can delete their events
       allow delete: if request.auth != null 
