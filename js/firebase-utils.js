@@ -15,8 +15,9 @@ async function saveStateToFirebase() {
             bringItems,
             additionalGuests,
             guestList,
-            password: currentEventPassword,
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            password: currentEventPassword
+            // Temporarily removed serverTimestamp to test if it's causing issues
+            // lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
         };
         
         // Preserve ownership and permissions
@@ -54,7 +55,21 @@ async function saveStateToFirebase() {
                 });
             }
             
-            await db.collection('events').doc(currentEventId).set(state, { merge: true });
+            // Try updating just the changed fields to reduce payload size
+            const updateData = {
+                rsvpData,
+                additionalGuests
+            };
+            
+            // Add ownership if needed
+            if (eventOwner) {
+                updateData.ownerId = eventOwner;
+            } else if (eventOwner === null) {
+                updateData.ownerId = null;
+            }
+            
+            console.log('🔧 Attempting minimal update:', updateData);
+            await db.collection('events').doc(currentEventId).update(updateData);
             console.log('✅ State saved to Firebase');
         } else {
             console.error('No event ID available for saving');
