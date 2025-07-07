@@ -502,9 +502,38 @@ async function initializeEventPage() {
     console.log('Event page initialized');
 }
 
+// Test Firebase write function - available globally
+window.debugFirebase = async function() {
+    try {
+        console.log('🧪 Debug Firebase test starting...');
+        console.log('Current event ID:', currentEventId);
+        console.log('Database reference:', db);
+        
+        if (!currentEventId) {
+            console.error('❌ No currentEventId available');
+            return false;
+        }
+        
+        const testData = { debugTest: 'hello', timestamp: new Date().toISOString() };
+        console.log('Attempting to write:', testData);
+        
+        await db.collection('events').doc(currentEventId).update(testData);
+        console.log('✅ Debug Firebase write successful');
+        return true;
+    } catch (error) {
+        console.error('❌ Debug Firebase write failed:', {
+            code: error.code,
+            message: error.message,
+            name: error.name
+        });
+        return false;
+    }
+};
+
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
     initializeEventPage();
+    console.log('🔧 Event page loaded, debugFirebase() function available');
 });
 
 // Close dropdown when clicking outside
