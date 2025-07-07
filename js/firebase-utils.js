@@ -20,9 +20,14 @@ async function saveStateToFirebase() {
         };
         
         // Preserve ownership and permissions
-        if (eventOwner !== undefined) {
+        // Only set ownerId if we have a valid owner (not null/undefined)
+        if (eventOwner) {
             state.ownerId = eventOwner;
+        } else if (eventOwner === null) {
+            // Explicitly set null for anonymous events
+            state.ownerId = null;
         }
+        // If eventOwner is undefined, don't include ownerId in the update
         if (eventPermissions) {
             state.permissions = eventPermissions;
         }
