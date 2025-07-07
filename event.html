@@ -13,6 +13,26 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-auth-compat.min.js"></script>
     
+    <!-- Inline test to check if JavaScript works at all -->
+    <script>
+        console.log('🔧 Inline JavaScript is working');
+        
+        // Test if Firebase CDN loaded
+        if (typeof firebase !== 'undefined') {
+            console.log('✅ Firebase CDN loaded successfully');
+        } else {
+            console.error('❌ Firebase CDN failed to load');
+        }
+        
+        // Make a simple test function available
+        window.testInline = function() {
+            console.log('✅ Inline test function works');
+            return 'Inline JavaScript is working';
+        };
+        
+        console.log('🔧 testInline() function is now available');
+    </script>
+    
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
