@@ -1,23 +1,36 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Events: Public read, flexible write permissions
+    // Events: Permissive rules to handle both anonymous and owned events
     match /events/{eventId} {
-      allow read: if true; // Public read for sharing
+      // Public read access for sharing events
+      allow read: if true;
       
-      // Allow creation for authenticated users OR anonymous events
-      allow create: if true; // Allow both authenticated and anonymous creation
+      // Allow creation for everyone (authenticated and anonymous)
+      allow create: if true;
       
-      // Allow updates for:
-      // 1. Authenticated owners
-      // 2. Anonymous events (no ownerId)
-      // 3. Events without ownerId field (legacy events)
-      allow update: if (request.auth != null && request.auth.uid == resource.data.ownerId)
-                    || (!("ownerId" in resource.data))
-                    || (resource.data.ownerId == null);
+      // Allow updates with comprehensive permission logic
+      allow update: if 
+        // Case 1: Authenticated user is the owner
+        (request.auth != null 
+         && resource.data.ownerId != null 
+         && request.auth.uid == resource.data.ownerId)
+        
+        // Case 2: Anonymous events (ownerId is null)
+        || (resource.data.ownerId == null)
+        
+        // Case 3: Legacy events without ownerId field (backward compatibility)
+        || (resource.data.ownerId is string == false)
+        
+        // Case 4: Converting anonymous event to owned (user signs up)
+        || (request.auth != null 
+            && resource.data.ownerId == null 
+            && request.data.ownerId == request.auth.uid);
       
-      // Only owners can delete their events
-      allow delete: if request.auth != null && request.auth.uid == resource.data.ownerId;
+      // Only authenticated owners can delete their events
+      allow delete: if request.auth != null 
+        && resource.data.ownerId != null 
+        && request.auth.uid == resource.data.ownerId;
     }
     
     // Users: Authenticated users can read/write their own data
