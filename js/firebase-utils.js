@@ -1,6 +1,30 @@
 // js/firebase-utils.js - Firebase Database Operations
 
 /**
+ * Test basic Firebase write operation
+ */
+async function testFirebaseWrite() {
+    try {
+        console.log('🧪 Testing basic Firebase write...');
+        const testData = { test: 'hello', timestamp: new Date().toISOString() };
+        await db.collection('events').doc(currentEventId).update(testData);
+        console.log('✅ Basic Firebase write successful');
+        return true;
+    } catch (error) {
+        console.error('❌ Basic Firebase write failed:', {
+            code: error.code,
+            message: error.message,
+            name: error.name,
+            stack: error.stack
+        });
+        return false;
+    }
+}
+
+// Make test function available globally for console testing
+window.testFirebaseWrite = testFirebaseWrite;
+
+/**
  * Save event state to Firebase with enhanced error handling
  */
 async function saveStateToFirebase() {
@@ -44,6 +68,13 @@ async function saveStateToFirebase() {
         });
         
         if (currentEventId) {
+            // First test basic Firebase connectivity
+            const basicTestPassed = await testFirebaseWrite();
+            if (!basicTestPassed) {
+                console.error('❌ Basic Firebase test failed, aborting save');
+                return;
+            }
+            
             // Try to get current document first to understand the state
             const currentDoc = await db.collection('events').doc(currentEventId).get();
             if (currentDoc.exists) {
@@ -51,8 +82,11 @@ async function saveStateToFirebase() {
                 console.log('📋 Current document state:', {
                     hasOwnerId: 'ownerId' in currentData,
                     currentOwnerId: currentData.ownerId,
-                    requestingOwnerId: state.ownerId
+                    requestingOwnerId: state.ownerId,
+                    documentSize: JSON.stringify(currentData).length
                 });
+            } else {
+                console.log('📋 Document does not exist yet');
             }
             
             // Try updating just the changed fields to reduce payload size
@@ -68,7 +102,11 @@ async function saveStateToFirebase() {
                 updateData.ownerId = null;
             }
             
-            console.log('🔧 Attempting minimal update:', updateData);
+            console.log('🔧 Attempting minimal update:', {
+                ...updateData,
+                payloadSize: JSON.stringify(updateData).length
+            });
+            
             await db.collection('events').doc(currentEventId).update(updateData);
             console.log('✅ State saved to Firebase');
         } else {
